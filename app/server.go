@@ -39,24 +39,28 @@ func handleClient(conn net.Conn) {
 		}
 	}(conn)
 
-	buf := make([]byte, 1024)
-	n, errRead := conn.Read(buf)
+	for {
+		buf := make([]byte, 1024)
+		n, errRead := conn.Read(buf)
 
-	if errRead != nil {
-		fmt.Println(errRead.Error())
-	}
+		if errRead != nil {
+			fmt.Println("Reading Error", errRead.Error())
 
-	var message = string(buf[:n])
+			break
+		}
 
-	if strings.Contains(strings.ToLower(message), "ping") {
-		fmt.Println("Command Contain PING")
+		var message = string(buf[:n])
 
-		respMessage := []byte("+PONG\r\n")
+		if strings.Contains(strings.ToLower(message), "ping") {
+			fmt.Println("Command Contain PING")
 
-		_, errWrite := conn.Write(respMessage)
+			respMessage := []byte("+PONG\r\n")
 
-		if errWrite != nil {
-			fmt.Println("Error Writing", errWrite.Error())
+			_, errWrite := conn.Write(respMessage)
+
+			if errWrite != nil {
+				fmt.Println("Writing Error", errWrite.Error())
+			}
 		}
 	}
 }
