@@ -27,7 +27,7 @@ func main() {
 			continue
 		}
 
-		handleClient(conn)
+		go handleClient(conn)
 	}
 }
 
@@ -62,5 +62,6 @@ func handleClient(conn net.Conn) {
 				fmt.Println("Writing Error", errWrite.Error())
 			}
 		}
+
 	}
 }
