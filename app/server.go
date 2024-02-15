@@ -35,7 +35,7 @@ func handleClient(conn net.Conn) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-
+			fmt.Println("An error occurs during closing connection.")
 		}
 	}(conn)
 
@@ -50,18 +50,25 @@ func handleClient(conn net.Conn) {
 		}
 
 		var message = string(buf[:n])
+		var respMessage []byte
 
 		if strings.Contains(strings.ToLower(message), "ping") {
-			fmt.Println("Command Contain PING")
+			respMessage = []byte("+PONG\r\n")
+		}
 
-			respMessage := []byte("+PONG\r\n")
+		if strings.Contains(strings.ToLower(message), "echo") {
+			messageParts := strings.Split(message, "\r\n")
+			text := messageParts[len(messageParts)-2]
+			respMessage = []byte("+" + text + "\r\n")
 
+		}
+
+		if len(respMessage) > 0 {
 			_, errWrite := conn.Write(respMessage)
 
 			if errWrite != nil {
 				fmt.Println("Writing Error", errWrite.Error())
 			}
 		}
-
 	}
 }
