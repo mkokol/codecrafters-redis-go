@@ -18,6 +18,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	dict := map[string]string{}
+
 	for {
 		conn, err := listener.Accept()
 
@@ -27,11 +29,11 @@ func main() {
 			continue
 		}
 
-		go handleClient(conn)
+		go handleClient(conn, dict)
 	}
 }
 
-func handleClient(conn net.Conn) {
+func handleClient(conn net.Conn, dict map[string]string) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
@@ -49,26 +51,34 @@ func handleClient(conn net.Conn) {
 			break
 		}
 
-		var message = string(buf[:n])
-		var respMessage []byte
+		message := strings.Split(string(buf[:n]), "\r\n")
+		command := strings.ToLower(message[2])
 
-		if strings.Contains(strings.ToLower(message), "ping") {
-			respMessage = []byte("+PONG\r\n")
-		}
+		var respMessage string
 
-		if strings.Contains(strings.ToLower(message), "echo") {
-			messageParts := strings.Split(message, "\r\n")
-			text := messageParts[len(messageParts)-2]
-			respMessage = []byte("+" + text + "\r\n")
+		switch command {
+		case "ping":
+			respMessage = "+PONG"
+		case "echo":
+			respMessage = "+" + message[4]
+		case "set":
+			dict[message[4]] = message[6]
+			respMessage = "+OK"
+		case "get":
+			respMessage = "$-1"
+			val, ok := dict[message[4]]
 
-		}
-
-		if len(respMessage) > 0 {
-			_, errWrite := conn.Write(respMessage)
-
-			if errWrite != nil {
-				fmt.Println("Writing Error", errWrite.Error())
+			if ok {
+				respMessage = "+" + val
 			}
+		default:
+			respMessage = "*0"
+		}
+
+		_, errWrite := conn.Write([]byte(fmt.Sprintf("%v\r\n", respMessage)))
+
+		if errWrite != nil {
+			fmt.Println("Writing Error", errWrite.Error())
 		}
 	}
 }
