@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -54,6 +56,11 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		message := strings.Split(string(buf[:n]), "\r\n")
 		command := strings.ToLower(message[2])
 
+		fmt.Println("---")
+		fmt.Println(message)
+		fmt.Println(len(message))
+		fmt.Println("---")
+
 		var respMessage string
 
 		switch command {
@@ -62,8 +69,22 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		case "echo":
 			respMessage = "+" + message[4]
 		case "set":
+			key := message[4]
 			dict[message[4]] = message[6]
 			respMessage = "+OK"
+
+			if len(message) == 12 && strings.ToLower(message[8]) == "px" {
+				ttlMS, err := strconv.Atoi(message[10])
+
+				if err != nil {
+					fmt.Println("Error to parse time to leave for ")
+
+					delete(dict, key)
+					respMessage = "$-1"
+				} else {
+					go waitThenDelete(dict, key, int64(ttlMS))
+				}
+			}
 		case "get":
 			respMessage = "$-1"
 			val, ok := dict[message[4]]
@@ -81,4 +102,10 @@ func handleClient(conn net.Conn, dict map[string]string) {
 			fmt.Println("Writing Error", errWrite.Error())
 		}
 	}
+}
+
+func waitThenDelete(dict map[string]string, key string, ttlMS int64) {
+	time.Sleep(time.Duration(ttlMS) * time.Millisecond)
+
+	delete(dict, key)
 }
