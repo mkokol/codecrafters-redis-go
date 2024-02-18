@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -11,9 +12,10 @@ import (
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+	openPort := flag.Int("port", 6379, "Port on which application would be lunched.")
+	flag.Parse()
 
-	listener, err := net.Listen("tcp", "0.0.0.0:6379")
+	listener, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(*openPort))
 
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
@@ -44,7 +46,7 @@ func handleClient(conn net.Conn, dict map[string]string) {
 	}(conn)
 
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, 256)
 		n, errRead := conn.Read(buf)
 
 		if errRead != nil {
@@ -56,11 +58,6 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		message := strings.Split(string(buf[:n]), "\r\n")
 		command := strings.ToLower(message[2])
 
-		fmt.Println("---")
-		fmt.Println(message)
-		fmt.Println(len(message))
-		fmt.Println("---")
-
 		var respMessage string
 
 		switch command {
@@ -69,29 +66,9 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		case "echo":
 			respMessage = "+" + message[4]
 		case "set":
-			key := message[4]
-			dict[message[4]] = message[6]
-			respMessage = "+OK"
-
-			if len(message) == 12 && strings.ToLower(message[8]) == "px" {
-				ttlMS, err := strconv.Atoi(message[10])
-
-				if err != nil {
-					fmt.Println("Error to parse time to leave for ")
-
-					delete(dict, key)
-					respMessage = "$-1"
-				} else {
-					go waitThenDelete(dict, key, int64(ttlMS))
-				}
-			}
+			respMessage = HandleSetCommand(message, dict)
 		case "get":
-			respMessage = "$-1"
-			val, ok := dict[message[4]]
-
-			if ok {
-				respMessage = "+" + val
-			}
+			respMessage = HandleGetCommand(message, dict)
 		default:
 			respMessage = "*0"
 		}
@@ -104,8 +81,38 @@ func handleClient(conn net.Conn, dict map[string]string) {
 	}
 }
 
-func waitThenDelete(dict map[string]string, key string, ttlMS int64) {
-	time.Sleep(time.Duration(ttlMS) * time.Millisecond)
+func HandleSetCommand(message []string, dict map[string]string) string {
+	key := message[4]
+	dict[message[4]] = message[6]
+	var respMessage = "+OK"
 
-	delete(dict, key)
+	if len(message) == 12 && strings.ToLower(message[8]) == "px" {
+		ttlMS, err := strconv.Atoi(message[10])
+
+		if err != nil {
+			fmt.Println("Error to parse time to leave for ")
+
+			delete(dict, key)
+			respMessage = "$-1"
+		} else {
+			go func(dict map[string]string, key string, ttlMS int64) {
+				time.Sleep(time.Duration(ttlMS) * time.Millisecond)
+
+				delete(dict, key)
+			}(dict, key, int64(ttlMS))
+		}
+	}
+
+	return respMessage
+}
+
+func HandleGetCommand(message []string, dict map[string]string) string {
+	var respMessage = "$-1"
+	val, ok := dict[message[4]]
+
+	if ok {
+		respMessage = "+" + val
+	}
+
+	return respMessage
 }
