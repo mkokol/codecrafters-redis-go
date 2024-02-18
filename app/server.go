@@ -58,6 +58,8 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		message := strings.Split(string(buf[:n]), "\r\n")
 		command := strings.ToLower(message[2])
 
+		fmt.Println(message)
+
 		var respMessage string
 
 		switch command {
@@ -69,6 +71,8 @@ func handleClient(conn net.Conn, dict map[string]string) {
 			respMessage = HandleSetCommand(message, dict)
 		case "get":
 			respMessage = HandleGetCommand(message, dict)
+		case "info":
+			respMessage = HandleInfoCommand()
 		default:
 			respMessage = "*0"
 		}
@@ -115,4 +119,8 @@ func HandleGetCommand(message []string, dict map[string]string) string {
 	}
 
 	return respMessage
+}
+
+func HandleInfoCommand() string {
+	return "+role:master"
 }
