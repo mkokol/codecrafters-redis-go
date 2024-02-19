@@ -10,12 +10,23 @@ import (
 	"time"
 )
 
+type Conf struct {
+	openPort  int
+	replicaOf string
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	openPort := flag.Int("port", 6379, "Port on which application would be lunched.")
+	openPortParam := flag.Int("port", 6379, "Port on which application would be lunched.")
+	replicaOfParam := flag.String("replicaof", "", "Port on which application would be lunched.")
 	flag.Parse()
 
-	listener, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(*openPort))
+	c := Conf{
+		openPort:  *openPortParam,
+		replicaOf: *replicaOfParam,
+	}
+
+	listener, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(c.openPort))
 
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
@@ -33,11 +44,11 @@ func main() {
 			continue
 		}
 
-		go handleClient(conn, dict)
+		go handleClient(conn, dict, c)
 	}
 }
 
-func handleClient(conn net.Conn, dict map[string]string) {
+func handleClient(conn net.Conn, dict map[string]string, c Conf) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
@@ -58,8 +69,6 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		message := strings.Split(string(buf[:n]), "\r\n")
 		command := strings.ToLower(message[2])
 
-		fmt.Println(message)
-
 		var respMessage string
 
 		switch command {
@@ -72,7 +81,7 @@ func handleClient(conn net.Conn, dict map[string]string) {
 		case "get":
 			respMessage = HandleGetCommand(message, dict)
 		case "info":
-			respMessage = HandleInfoCommand()
+			respMessage = HandleInfoCommand(c)
 		default:
 			respMessage = "*0"
 		}
@@ -121,6 +130,12 @@ func HandleGetCommand(message []string, dict map[string]string) string {
 	return respMessage
 }
 
-func HandleInfoCommand() string {
-	return "+role:master"
+func HandleInfoCommand(c Conf) string {
+	replicaType := "master"
+
+	if c.replicaOf != "" {
+		replicaType = "slave"
+	}
+
+	return fmt.Sprintf("+role:%s", replicaType)
 }
