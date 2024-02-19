@@ -4,22 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 )
-
-const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
-
-func randStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
 
 func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
 	defer func(conn net.Conn) {
@@ -57,6 +46,9 @@ func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
 			respMessage = HandleInfoCommand(c)
 		case "replconf":
 			respMessage = "+OK"
+		case "psync":
+			respMessage = HandlePSyncCommand(message)
+
 		default:
 			respMessage = "*0"
 		}
@@ -116,7 +108,7 @@ func HandleInfoCommand(config domain.Conf) string {
 	}
 
 	//master_replid: The replication ID of the Redis server.
-	params["master_replid"] = randStringBytes(40)
+	params["master_replid"] = RandStringBytes(40)
 
 	//master_repl_offset: The server's current replication offset
 	params["master_repl_offset"] = "0"
@@ -134,4 +126,15 @@ func HandleInfoCommand(config domain.Conf) string {
 	respMessage := paramsStrBuffer.String()
 
 	return fmt.Sprintf("$%d\r\n%s", len(respMessage), respMessage)
+}
+
+func HandlePSyncCommand(message []string) string {
+	respMessage := "+OK"
+
+	if message[4] == "?" {
+		replicationId := RandStringBytes(40)
+		respMessage = fmt.Sprintf("+FULLRESYNC %s 0", replicationId)
+	}
+
+	return respMessage
 }

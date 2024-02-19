@@ -3,9 +3,20 @@ package core
 import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
+	"math/rand"
 	"os"
 	"strconv"
 )
+
+const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 
 func ParseCliParams() domain.Conf {
 	cmdParams := os.Args[1:]
