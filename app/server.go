@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -18,7 +20,7 @@ type Conf struct {
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	openPortParam := flag.Int("port", 6379, "Port on which application would be lunched.")
-	replicaOfParam := flag.String("replicaof", "", "Port on which application would be lunched.")
+	replicaOfParam := flag.String("replicaof", "", "Host and Port of the master server.")
 	flag.Parse()
 
 	c := Conf{
@@ -131,11 +133,42 @@ func HandleGetCommand(message []string, dict map[string]string) string {
 }
 
 func HandleInfoCommand(c Conf) string {
-	replicaType := "master"
+	params := map[string]string{}
+
+	//role: Value is "master" if the instance is replica of no one, or "slave" if the instance is a replica of some master instance. Note that a replica can be master of another replica (chained replication).
+	params["role"] = "master"
 
 	if c.replicaOf != "" {
-		replicaType = "slave"
+		params["role"] = "slave"
 	}
 
-	return fmt.Sprintf("+role:%s", replicaType)
+	//master_replid: The replication ID of the Redis server.
+	params["master_replid"] = RandStringBytes(40)
+
+	//master_repl_offset: The server's current replication offset
+	params["master_repl_offset"] = "0"
+
+	paramsStrBuffer := new(bytes.Buffer)
+
+	for key, value := range params {
+		_, err := fmt.Fprintf(paramsStrBuffer, "%s:%s\r\n", key, value)
+
+		if err != nil {
+			fmt.Println("can not join params in to string")
+		}
+	}
+
+	respMessage := paramsStrBuffer.String()
+
+	return fmt.Sprintf("$%d\r\n%s", len(respMessage), respMessage)
+}
+
+const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }
