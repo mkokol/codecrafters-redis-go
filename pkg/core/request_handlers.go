@@ -55,6 +55,8 @@ func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
 			respMessage = HandleGetCommand(message, dict)
 		case "info":
 			respMessage = HandleInfoCommand(c)
+		case "replconf":
+			respMessage = "+OK"
 		default:
 			respMessage = "*0"
 		}
