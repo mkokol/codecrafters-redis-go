@@ -7,9 +7,11 @@ import (
 	"os"
 )
 
-func HandleHandShake(config domain.Conf) {
-	if config.MasterHost == "" {
-		return
+var connClientObj *net.Conn
+
+func getClient(config domain.Conf) net.Conn {
+	if connClientObj != nil {
+		return *connClientObj
 	}
 
 	masterAddr := fmt.Sprintf("%s:%d", config.MasterHost, config.MasterPort)
@@ -21,6 +23,44 @@ func HandleHandShake(config domain.Conf) {
 		os.Exit(1)
 	}
 
+	connClientObj = &connClient
+
+	return *connClientObj
+}
+
+func sendCommand(connClient net.Conn, command string) {
+	_, err := connClient.Write(
+		[]byte(command),
+	)
+
+	if err != nil {
+		fmt.Println("Write to server failed:", err.Error())
+
+		os.Exit(1)
+	}
+
+	reply := make([]byte, 1024)
+
+	_, err = connClient.Read(reply)
+
+	if err != nil {
+		fmt.Println("Write to server failed:", err.Error())
+
+		os.Exit(1)
+	}
+
+	fmt.Println("reply from server=", string(reply))
+}
+
+func SendHandShake(config domain.Conf) {
+	if config.MasterHost == "" {
+		fmt.Println("There is no master conf")
+
+		return
+	}
+
+	connClient := getClient(config)
+
 	commands := []string{
 		"*1\r\n$4\r\nping\r\n",
 		fmt.Sprintf("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n%d\r\n", config.OpenPort),
@@ -29,34 +69,6 @@ func HandleHandShake(config domain.Conf) {
 	}
 
 	for _, command := range commands {
-		_, err := connClient.Write(
-			[]byte(command),
-		)
-
-		if err != nil {
-			fmt.Println("Write to server failed:", err.Error())
-
-			os.Exit(1)
-		}
-
-		reply := make([]byte, 1024)
-
-		_, err = connClient.Read(reply)
-
-		if err != nil {
-			fmt.Println("Write to server failed:", err.Error())
-
-			os.Exit(1)
-		}
-
-		fmt.Println("reply from server=", string(reply))
-	}
-
-	err = connClient.Close()
-
-	if err != nil {
-		fmt.Println("Can't close the connection:", err.Error())
-
-		os.Exit(1)
+		sendCommand(connClient, command)
 	}
 }

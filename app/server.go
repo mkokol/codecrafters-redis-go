@@ -9,11 +9,10 @@ import (
 )
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-
 	config := core.ParseCliParams()
-	listener, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(config.OpenPort))
-	go core.HandleHandShake(config)
+	listenOn := "0.0.0.0:" + strconv.Itoa(config.OpenPort)
+	listener, err := net.Listen("tcp", listenOn)
+	go core.SendHandShake(config)
 
 	if err != nil {
 		fmt.Println("Failed to bind to port:", config.OpenPort)
@@ -21,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("")
+	fmt.Println("Listen on: ", listenOn)
 
 	dict := map[string]string{}
 

@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"net"
@@ -10,7 +11,7 @@ import (
 	"time"
 )
 
-func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
+func HandleClient(conn net.Conn, dict map[string]string, config domain.Conf) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
@@ -43,7 +44,7 @@ func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
 		case "get":
 			respMessage = HandleGetCommand(message, dict)
 		case "info":
-			respMessage = HandleInfoCommand(c)
+			respMessage = HandleInfoCommand(config)
 		case "replconf":
 			respMessage = "+OK"
 		case "psync":
@@ -57,6 +58,10 @@ func HandleClient(conn net.Conn, dict map[string]string, c domain.Conf) {
 
 		if errWrite != nil {
 			fmt.Println("Writing Error", errWrite.Error())
+		}
+
+		if command == "psync" {
+			SendRDBFile(conn)
 		}
 	}
 }
@@ -137,4 +142,18 @@ func HandlePSyncCommand(message []string) string {
 	}
 
 	return respMessage
+}
+
+func SendRDBFile(conn net.Conn) {
+	data, err := base64.StdEncoding.DecodeString("UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==")
+
+	if err != nil {
+		fmt.Println("Can't parse RDB file base64 content: ", err.Error())
+	}
+
+	_, errWrite := conn.Write([]byte(fmt.Sprintf("$%d\r\n%s", len(data), data)))
+
+	if errWrite != nil {
+		fmt.Println("Writing Error", errWrite.Error())
+	}
 }
