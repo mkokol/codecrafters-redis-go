@@ -11,7 +11,12 @@ import (
 	"time"
 )
 
-func HandleClient(conn net.Conn, dict map[string]string, config domain.Conf) {
+func HandleClient(
+	conn net.Conn,
+	replicas map[int]net.Conn,
+	dict map[string]string,
+	config domain.Conf,
+) {
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
@@ -28,8 +33,8 @@ func HandleClient(conn net.Conn, dict map[string]string, config domain.Conf) {
 
 			break
 		}
-
-		message := strings.Split(string(buf[:n]), "\r\n")
+		rawMessage := string(buf[:n])
+		message := strings.Split(rawMessage, "\r\n")
 		command := strings.ToLower(message[2])
 
 		var respMessage string
@@ -41,15 +46,25 @@ func HandleClient(conn net.Conn, dict map[string]string, config domain.Conf) {
 			respMessage = "+" + message[4]
 		case "set":
 			respMessage = HandleSetCommand(message, dict)
+
+			for _, replica := range replicas {
+				_, err := replica.Write([]byte(rawMessage))
+
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
 		case "get":
 			respMessage = HandleGetCommand(message, dict)
 		case "info":
 			respMessage = HandleInfoCommand(config)
 		case "replconf":
 			respMessage = "+OK"
-		case "psync":
-			respMessage = HandlePSyncCommand(message)
 
+			replicas[len(replicas)] = conn
+		case "psync":
+
+			respMessage = HandlePSyncCommand(message)
 		default:
 			respMessage = "*0"
 		}
