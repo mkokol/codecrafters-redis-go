@@ -22,9 +22,6 @@ func main() {
 
 	fmt.Println("Listen on: ", listenOn)
 
-	dict := map[string]string{}
-	replicas := map[int]net.Conn{}
-
 	for {
 		conn, err := listener.Accept()
 
@@ -34,6 +31,6 @@ func main() {
 			continue
 		}
 
-		go core.HandleClient(conn, replicas, dict, config)
+		go core.HandleClient(conn, config)
 	}
 }

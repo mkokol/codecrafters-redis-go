@@ -13,8 +13,6 @@ import (
 
 func HandleClient(
 	conn net.Conn,
-	replicas map[int]net.Conn,
-	dict map[string]string,
 	config domain.Conf,
 ) {
 	defer func(conn net.Conn) {
@@ -45,9 +43,9 @@ func HandleClient(
 		case "echo":
 			respMessage = "+" + message[4]
 		case "set":
-			respMessage = HandleSetCommand(message, dict)
+			respMessage = HandleSetCommand(message, domain.Dict)
 
-			for _, replica := range replicas {
+			for _, replica := range domain.Replicas {
 				_, err := replica.Write([]byte(rawMessage))
 
 				if err != nil {
@@ -55,13 +53,13 @@ func HandleClient(
 				}
 			}
 		case "get":
-			respMessage = HandleGetCommand(message, dict)
+			respMessage = HandleGetCommand(message, domain.Dict)
 		case "info":
 			respMessage = HandleInfoCommand(config)
 		case "replconf":
 			respMessage = "+OK"
 
-			replicas[len(replicas)] = conn
+			domain.Replicas[len(domain.Replicas)] = conn
 		case "psync":
 
 			respMessage = HandlePSyncCommand(message)
