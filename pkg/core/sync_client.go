@@ -5,6 +5,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"net"
 	"os"
+	"strings"
 )
 
 var connClientObj *net.Conn
@@ -38,18 +39,6 @@ func sendCommand(connClient net.Conn, command string) {
 
 		os.Exit(1)
 	}
-
-	reply := make([]byte, 1024)
-
-	_, err = connClient.Read(reply)
-
-	if err != nil {
-		fmt.Println("Write to server failed:", err.Error())
-
-		os.Exit(1)
-	}
-
-	fmt.Println("reply from server=", string(reply))
 }
 
 func SendHandShake(config domain.Conf) {
@@ -70,5 +59,34 @@ func SendHandShake(config domain.Conf) {
 
 	for _, command := range commands {
 		sendCommand(connClient, command)
+	}
+
+	for {
+		buf := make([]byte, 256)
+		n, errRead := connClient.Read(buf)
+
+		if errRead != nil {
+			fmt.Println("Error for getting data from master:", errRead.Error())
+
+			break
+		}
+
+		messages := strings.Split(string(buf[:n]), "*")
+
+		for _, rawMessage := range messages[1:] {
+			rawMessage = "*" + rawMessage
+			message := strings.Split(rawMessage, "\r\n")
+			command := strings.ToLower(message[2])
+
+			if command == "set" {
+				HandleSetCommand(message, domain.Dict)
+			}
+		}
+
+		_, err := connClient.Write([]byte("+OK\r\n"))
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 }
