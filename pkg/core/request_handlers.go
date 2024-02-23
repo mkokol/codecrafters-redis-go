@@ -31,52 +31,99 @@ func HandleClient(
 
 			break
 		}
-		rawMessage := string(buf[:n])
-		message := strings.Split(rawMessage, "\r\n")
-		command := strings.ToLower(message[2])
+		HandleCommands(config, conn, buf[:n])
+	}
+}
 
-		var respMessage string
+func HandleCommands(config domain.Conf, conn net.Conn, data []byte) {
+	for _, command := range splitCommands(data) {
+		HandleCommand(config, conn, command)
+	}
+}
 
-		switch command {
-		case "ping":
-			respMessage = "+PONG"
-		case "echo":
-			respMessage = "+" + message[4]
-		case "set":
-			respMessage = HandleSetCommand(message, domain.Dict)
+func HandleCommand(config domain.Conf, conn net.Conn, rawMessage string) {
+	message := strings.Split(rawMessage, "\r\n")
 
-			for _, replica := range domain.Replicas {
+	if len(message) < 3 {
+		return
+	}
+
+	command := strings.ToLower(message[2])
+
+	var respMessage string
+
+	fmt.Println(">>> > > Commands to execute:", command)
+
+	switch command {
+	case "ping":
+		respMessage = "+PONG"
+	case "echo":
+		respMessage = "+" + message[4]
+	case "set":
+		respMessage = HandleSetCommand(message, domain.Dict)
+
+		for replicaId, replica := range domain.Replicas {
+			if replicaId != conn.RemoteAddr().String() {
 				_, err := replica.Write([]byte(rawMessage))
 
 				if err != nil {
 					fmt.Println(err.Error())
 				}
 			}
-		case "get":
-			respMessage = HandleGetCommand(message, domain.Dict)
-		case "info":
-			respMessage = HandleInfoCommand(config)
-		case "replconf":
-			respMessage = "+OK"
+		}
+	case "get":
+		respMessage = HandleGetCommand(message, domain.Dict)
+	case "info":
+		respMessage = HandleInfoCommand(config)
+	case "replconf":
+		respMessage = HandleReplConfCommand(message)
+		replicaId := conn.RemoteAddr().String()
 
-			domain.Replicas[len(domain.Replicas)] = conn
-		case "psync":
-
-			respMessage = HandlePSyncCommand(message)
-		default:
-			respMessage = "*0"
+		if _, ok := domain.Replicas[replicaId]; !ok {
+			domain.Replicas[replicaId] = conn
 		}
 
-		_, errWrite := conn.Write([]byte(fmt.Sprintf("%v\r\n", respMessage)))
+	case "psync":
+		respMessage = HandlePSyncCommand(message)
+	default:
+		respMessage = "*0"
+	}
 
-		if errWrite != nil {
-			fmt.Println("Writing Error", errWrite.Error())
-		}
+	_, errWrite := conn.Write([]byte(fmt.Sprintf("%v\r\n", respMessage)))
 
-		if command == "psync" {
-			SendRDBFile(conn)
+	if errWrite != nil {
+		fmt.Println("Writing Error", errWrite.Error())
+
+		replicaId := conn.RemoteAddr().String()
+
+		if _, ok := domain.Replicas[replicaId]; !ok {
+			delete(domain.Replicas, replicaId)
 		}
 	}
+
+	if command == "psync" {
+		SendRDBFile(conn)
+	}
+}
+
+func splitCommands(data []byte) []string {
+	var newCommand []string
+	var commands []string
+
+	for _, letter := range string(data) {
+
+		if len(newCommand) > 0 && (letter == '+' || letter == '*') {
+			commands = append(commands, strings.Join(newCommand, ""))
+
+			newCommand = []string{}
+		}
+
+		newCommand = append(newCommand, string(letter))
+	}
+
+	commands = append(commands, strings.Join(newCommand, ""))
+
+	return commands
 }
 
 func HandleSetCommand(message []string, dict map[string]string) string {
@@ -144,6 +191,16 @@ func HandleInfoCommand(config domain.Conf) string {
 	respMessage := paramsStrBuffer.String()
 
 	return fmt.Sprintf("$%d\r\n%s", len(respMessage), respMessage)
+}
+
+func HandleReplConfCommand(message []string) string {
+	respMessage := "+OK"
+
+	if strings.ToLower(message[4]) == "getack" {
+		respMessage = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0"
+	}
+
+	return respMessage
 }
 
 func HandlePSyncCommand(message []string) string {

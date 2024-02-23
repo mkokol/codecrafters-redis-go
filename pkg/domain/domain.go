@@ -10,4 +10,4 @@ type Conf struct {
 
 var Dict = map[string]string{}
 
-var Replicas = map[int]net.Conn{}
+var Replicas = map[string]net.Conn{}

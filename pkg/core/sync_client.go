@@ -61,6 +61,12 @@ func SendHandShake(config domain.Conf) {
 		sendCommand(connClient, command)
 	}
 
+	replicaId := connClient.RemoteAddr().String()
+
+	if _, ok := domain.Replicas[replicaId]; !ok {
+		domain.Replicas[replicaId] = connClient
+	}
+
 	for {
 		buf := make([]byte, 256)
 		n, errRead := connClient.Read(buf)
@@ -71,22 +77,12 @@ func SendHandShake(config domain.Conf) {
 			break
 		}
 
-		messages := strings.Split(string(buf[:n]), "*")
+		rawMessage := string(buf[:n])
+		message := strings.Split(rawMessage, "\r\n")
+		resp := strings.ToLower(message[0])
 
-		for _, rawMessage := range messages[1:] {
-			rawMessage = "*" + rawMessage
-			message := strings.Split(rawMessage, "\r\n")
-			command := strings.ToLower(message[2])
-
-			if command == "set" {
-				HandleSetCommand(message, domain.Dict)
-			}
-		}
-
-		_, err := connClient.Write([]byte("+OK\r\n"))
-
-		if err != nil {
-			fmt.Println(err.Error())
+		if resp != "+pong" && resp != "+ok" {
+			HandleCommands(config, connClient, buf[:n])
 		}
 	}
 }
