@@ -52,7 +52,7 @@ func HandleCommand(config domain.Conf, conn net.Conn, rawMessage string) {
 
 	var respMessage string
 
-	fmt.Println(">>> > > Commands to execute:", command)
+	//fmt.Println(">>> > > Commands to execute:", command)
 
 	switch command {
 	case "ping":
