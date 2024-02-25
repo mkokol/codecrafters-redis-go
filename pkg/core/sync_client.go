@@ -5,7 +5,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"net"
 	"os"
-	"strings"
 )
 
 var connClientObj *net.Conn
@@ -61,28 +60,7 @@ func SendHandShake(config domain.Conf) {
 		sendCommand(connClient, command)
 	}
 
-	replicaId := connClient.RemoteAddr().String()
+	Replications.Add(connClient)
 
-	if _, ok := domain.Replicas[replicaId]; !ok {
-		domain.Replicas[replicaId] = connClient
-	}
-
-	for {
-		buf := make([]byte, 256)
-		n, errRead := connClient.Read(buf)
-
-		if errRead != nil {
-			fmt.Println("Error for getting data from master:", errRead.Error())
-
-			break
-		}
-
-		rawMessage := string(buf[:n])
-		message := strings.Split(rawMessage, "\r\n")
-		resp := strings.ToLower(message[0])
-
-		if resp != "+pong" && resp != "+ok" {
-			HandleCommands(config, connClient, buf[:n])
-		}
-	}
+	go HandleClient(connClient, config)
 }

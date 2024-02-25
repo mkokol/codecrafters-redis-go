@@ -8,8 +8,15 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
+
+var Dict = domain.SmartDict{
+	Data: map[string]string{},
+}
+
+var Replications = domain.Replication{
+	Replicas: map[string]net.Conn{},
+}
 
 func HandleClient(
 	conn net.Conn,
@@ -23,7 +30,7 @@ func HandleClient(
 	}(conn)
 
 	for {
-		buf := make([]byte, 256)
+		buf := make([]byte, 1024)
 		n, errRead := conn.Read(buf)
 
 		if errRead != nil {
@@ -42,6 +49,10 @@ func HandleCommands(config domain.Conf, conn net.Conn, data []byte) {
 }
 
 func HandleCommand(config domain.Conf, conn net.Conn, rawMessage string) {
+	if rawMessage[0] == '+' {
+		return
+	}
+
 	message := strings.Split(rawMessage, "\r\n")
 
 	if len(message) < 3 {
@@ -52,57 +63,37 @@ func HandleCommand(config domain.Conf, conn net.Conn, rawMessage string) {
 
 	var respMessage string
 
-	//fmt.Println(">>> > > Commands to execute:", command)
-
 	switch command {
 	case "ping":
-		respMessage = "+PONG"
+		respMessage = "+PONG\r\n"
 	case "echo":
-		respMessage = "+" + message[4]
+		respMessage = "+" + message[4] + "\r\n"
 	case "set":
-		respMessage = HandleSetCommand(message, domain.Dict)
-
-		for replicaId, replica := range domain.Replicas {
-			if replicaId != conn.RemoteAddr().String() {
-				_, err := replica.Write([]byte(rawMessage))
-
-				if err != nil {
-					fmt.Println(err.Error())
-				}
-			}
-		}
+		respMessage = HandleSetCommand(message)
+		Replications.NotifyAllReplicas(conn, rawMessage)
 	case "get":
-		respMessage = HandleGetCommand(message, domain.Dict)
+		respMessage = HandleGetCommand(message)
 	case "info":
 		respMessage = HandleInfoCommand(config)
 	case "replconf":
 		respMessage = HandleReplConfCommand(message)
-		replicaId := conn.RemoteAddr().String()
-
-		if _, ok := domain.Replicas[replicaId]; !ok {
-			domain.Replicas[replicaId] = conn
-		}
-
+		Replications.Add(conn)
 	case "psync":
 		respMessage = HandlePSyncCommand(message)
 	default:
 		respMessage = "*0"
 	}
 
-	_, errWrite := conn.Write([]byte(fmt.Sprintf("%v\r\n", respMessage)))
+	_, errWrite := conn.Write([]byte(respMessage))
 
 	if errWrite != nil {
 		fmt.Println("Writing Error", errWrite.Error())
 
-		replicaId := conn.RemoteAddr().String()
-
-		if _, ok := domain.Replicas[replicaId]; !ok {
-			delete(domain.Replicas, replicaId)
-		}
+		Replications.Remove(conn)
 	}
 
 	if command == "psync" {
-		SendRDBFile(conn)
+		go SendRDBFile(conn)
 	}
 }
 
@@ -126,40 +117,36 @@ func splitCommands(data []byte) []string {
 	return commands
 }
 
-func HandleSetCommand(message []string, dict map[string]string) string {
-	key := message[4]
-	dict[message[4]] = message[6]
+func HandleSetCommand(message []string) string {
+	var key = message[4]
+	var val = message[6]
+	var ttlMS = -1
 	var respMessage = "+OK"
 
 	if len(message) == 12 && strings.ToLower(message[8]) == "px" {
-		ttlMS, err := strconv.Atoi(message[10])
+		var err error
+		ttlMS, err = strconv.Atoi(message[10])
 
 		if err != nil {
 			fmt.Println("Error to parse time to leave for ")
 
-			delete(dict, key)
 			respMessage = "$-1"
-		} else {
-			go func(dict map[string]string, key string, ttlMS int64) {
-				time.Sleep(time.Duration(ttlMS) * time.Millisecond)
-
-				delete(dict, key)
-			}(dict, key, int64(ttlMS))
 		}
 	}
 
-	return respMessage
+	Dict.Add(key, val, ttlMS)
+
+	return respMessage + "\r\n"
 }
 
-func HandleGetCommand(message []string, dict map[string]string) string {
-	var respMessage = "$-1"
-	val, ok := dict[message[4]]
+func HandleGetCommand(message []string) string {
+	val, ok := Dict.Get(message[4])
 
 	if ok {
-		respMessage = "+" + val
+		return "+" + val + "\r\n"
 	}
 
-	return respMessage
+	return "$-1\r\n"
 }
 
 func HandleInfoCommand(config domain.Conf) string {
@@ -190,25 +177,25 @@ func HandleInfoCommand(config domain.Conf) string {
 
 	respMessage := paramsStrBuffer.String()
 
-	return fmt.Sprintf("$%d\r\n%s", len(respMessage), respMessage)
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(respMessage), respMessage)
 }
 
 func HandleReplConfCommand(message []string) string {
-	respMessage := "+OK"
+	respMessage := "+OK\r\n"
 
 	if strings.ToLower(message[4]) == "getack" {
-		respMessage = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0"
+		respMessage = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n"
 	}
 
 	return respMessage
 }
 
 func HandlePSyncCommand(message []string) string {
-	respMessage := "+OK"
+	respMessage := "+OK\r\n"
 
 	if message[4] == "?" {
 		replicationId := RandStringBytes(40)
-		respMessage = fmt.Sprintf("+FULLRESYNC %s 0", replicationId)
+		respMessage = fmt.Sprintf("+FULLRESYNC %s 0\r\n", replicationId)
 	}
 
 	return respMessage

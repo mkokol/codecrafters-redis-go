@@ -12,7 +12,7 @@ func main() {
 	config := core.ParseCliParams()
 	listenOn := "0.0.0.0:" + strconv.Itoa(config.OpenPort)
 	listener, err := net.Listen("tcp", listenOn)
-	go core.SendHandShake(config)
+	core.SendHandShake(config)
 
 	if err != nil {
 		fmt.Println("Failed to bind to port:", config.OpenPort)
