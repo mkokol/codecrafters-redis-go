@@ -5,17 +5,18 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"net"
 	"os"
+	"strconv"
 )
 
-var connClientObj *net.Conn
+func SendHandShake() {
+	if domain.Config.MasterHost == "" {
+		fmt.Println("There is no master conf")
 
-func getClient(config domain.Conf) net.Conn {
-	if connClientObj != nil {
-		return *connClientObj
+		return
 	}
 
-	masterAddr := fmt.Sprintf("%s:%d", config.MasterHost, config.MasterPort)
-	connClient, err := net.Dial("tcp", masterAddr)
+	masterAddr := fmt.Sprintf("%s:%d", domain.Config.MasterHost, domain.Config.MasterPort)
+	conn, err := net.Dial("tcp", masterAddr)
 
 	if err != nil {
 		fmt.Println("Dial failed:", err.Error())
@@ -23,44 +24,34 @@ func getClient(config domain.Conf) net.Conn {
 		os.Exit(1)
 	}
 
-	connClientObj = &connClient
-
-	return *connClientObj
-}
-
-func sendCommand(connClient net.Conn, command string) {
-	_, err := connClient.Write(
-		[]byte(command),
-	)
-
-	if err != nil {
-		fmt.Println("Write to server failed:", err.Error())
-
-		os.Exit(1)
+	connection := domain.Connection{
+		Conn:      &conn,
+		ParsedLen: 0,
+		Type:      "Master",
 	}
-}
-
-func SendHandShake(config domain.Conf) {
-	if config.MasterHost == "" {
-		fmt.Println("There is no master conf")
-
-		return
-	}
-
-	connClient := getClient(config)
+	Replications.Add(&connection)
 
 	commands := []string{
-		"*1\r\n$4\r\nping\r\n",
-		fmt.Sprintf("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n%d\r\n", config.OpenPort),
-		"*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n",
-		"*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n",
+		domain.RedisStringArray([]string{"PING"}),
+		domain.RedisStringArray([]string{"REPLCONF", "listening-port", strconv.Itoa(domain.Config.OpenPort)}),
+		domain.RedisStringArray([]string{"REPLCONF", "capa", "psync2"}),
+		domain.RedisStringArray([]string{"PSYNC", "?", "-1"}),
 	}
+
+	go HandleClient(&connection)
 
 	for _, command := range commands {
-		sendCommand(connClient, command)
+		_, err := conn.Write(
+			[]byte(command),
+		)
+
+		if err != nil {
+			fmt.Println("Write to server failed:", err.Error())
+
+			os.Exit(1)
+		}
 	}
 
-	Replications.Add(connClient)
+	fmt.Println("!!!!!!!!!!!!!!! COMMAND")
 
-	go HandleClient(connClient, config)
 }

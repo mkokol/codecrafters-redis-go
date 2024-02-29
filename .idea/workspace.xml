@@ -7,9 +7,12 @@
     <list default="true" id="03e67d81-f6c2-4dd2-a75d-ab32d424f913" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/app/server.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pkg/core/core.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/core/core.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pkg/core/request_handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/core/request_handlers.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pkg/core/sync_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/core/sync_client.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pkg/domain/domain.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/domain.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pkg/domain/replication.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/replication.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pkg/domain/smart_dict.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/smart_dict.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,7 +88,12 @@
       <workItem from="1708250099733" duration="16490000" />
       <workItem from="1708349546757" duration="14642000" />
       <workItem from="1708444020923" duration="32162000" />
-      <workItem from="1708853430904" duration="4148000" />
+      <workItem from="1708853430904" duration="6342000" />
+      <workItem from="1708939169661" duration="16000" />
+      <workItem from="1708939197546" duration="16402000" />
+      <workItem from="1709030682977" duration="6060000" />
+      <workItem from="1709067961752" duration="10362000" />
+      <workItem from="1709150531421" duration="4815000" />
     </task>
     <servers />
   </component>

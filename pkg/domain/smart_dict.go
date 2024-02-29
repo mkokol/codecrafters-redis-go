@@ -7,13 +7,14 @@ import (
 
 type SmartDict struct {
 	Data map[string]string
-	Mu   sync.Mutex
+	mu   sync.Mutex
 }
 
 func (sd *SmartDict) Add(key string, val string, ttlMS int) {
-	sd.Mu.Lock()
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
 	sd.Data[key] = val
-	sd.Mu.Unlock()
 
 	if ttlMS == -1 {
 		return
@@ -27,15 +28,17 @@ func (sd *SmartDict) Add(key string, val string, ttlMS int) {
 }
 
 func (sd *SmartDict) Get(key string) (string, bool) {
-	sd.Mu.Lock()
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
 	val, ok := sd.Data[key]
-	sd.Mu.Unlock()
 
 	return val, ok
 }
 
 func (sd *SmartDict) Remove(key string) {
-	sd.Mu.Lock()
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
 	delete(sd.Data, key)
-	sd.Mu.Unlock()
 }

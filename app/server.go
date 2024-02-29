@@ -3,19 +3,21 @@ package main
 import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/core"
+	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"net"
 	"os"
 	"strconv"
 )
 
 func main() {
-	config := core.ParseCliParams()
-	listenOn := "0.0.0.0:" + strconv.Itoa(config.OpenPort)
+	domain.Config = core.ParseCliParams()
+	listenOn := "0.0.0.0:" + strconv.Itoa(domain.Config.OpenPort)
 	listener, err := net.Listen("tcp", listenOn)
-	core.SendHandShake(config)
+
+	core.SendHandShake()
 
 	if err != nil {
-		fmt.Println("Failed to bind to port:", config.OpenPort)
+		fmt.Println("Failed to bind to port:", domain.Config.OpenPort)
 
 		os.Exit(1)
 	}
@@ -31,6 +33,10 @@ func main() {
 			continue
 		}
 
-		go core.HandleClient(conn, config)
+		go core.HandleClient(&domain.Connection{
+			Conn:      &conn,
+			Type:      "User",
+			ParsedLen: 0,
+		})
 	}
 }

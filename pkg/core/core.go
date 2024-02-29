@@ -4,11 +4,20 @@ import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 )
 
 const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+var Dict = domain.SmartDict{
+	Data: map[string]string{},
+}
+
+var Replications = domain.Replication{
+	Connections: map[string]*domain.Connection{},
+}
 
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
@@ -64,4 +73,30 @@ func ParseCliParams() domain.Conf {
 	}
 
 	return config
+}
+
+func HandleClient(
+	connection *domain.Connection,
+) {
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("An error occurs during closing connection.")
+		}
+	}(*connection.Conn)
+
+	for {
+		buf := make([]byte, 1024)
+		n, errRead := (*connection.Conn).Read(buf)
+
+		if errRead != nil {
+			fmt.Println("Reading Error", errRead.Error())
+
+			break
+		}
+
+		for _, command := range domain.ParsCommands(buf[:n]) {
+			HandleCommand(connection, command)
+		}
+	}
 }
