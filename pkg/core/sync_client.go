@@ -25,11 +25,10 @@ func SendHandShake() {
 	}
 
 	connection := domain.Connection{
-		Conn:      &conn,
-		ParsedLen: 0,
-		Type:      "Master",
+		Net:  &conn,
+		Type: "Master",
 	}
-	Replications.Add(&connection)
+	domain.Replications.Add(&connection)
 
 	commands := []string{
 		domain.RedisStringArray([]string{"PING"}),
@@ -40,18 +39,7 @@ func SendHandShake() {
 
 	go HandleClient(&connection)
 
-	for _, command := range commands {
-		_, err := conn.Write(
-			[]byte(command),
-		)
-
-		if err != nil {
-			fmt.Println("Write to server failed:", err.Error())
-
-			os.Exit(1)
-		}
+	for _, commandMessage := range commands {
+		connection.HandleWrite(commandMessage)
 	}
-
-	fmt.Println("!!!!!!!!!!!!!!! COMMAND")
-
 }

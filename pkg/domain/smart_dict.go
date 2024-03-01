@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type SmartDict struct {
+type smartDict struct {
 	Data map[string]string
 	mu   sync.Mutex
 }
 
-func (sd *SmartDict) Add(key string, val string, ttlMS int) {
+func (sd *smartDict) Add(key string, val string, ttlMS int) {
 	sd.mu.Lock()
 	defer sd.mu.Unlock()
 
@@ -27,7 +27,7 @@ func (sd *SmartDict) Add(key string, val string, ttlMS int) {
 	}(sd.Data, key, int64(ttlMS))
 }
 
-func (sd *SmartDict) Get(key string) (string, bool) {
+func (sd *smartDict) Get(key string) (string, bool) {
 	sd.mu.Lock()
 	defer sd.mu.Unlock()
 
@@ -36,9 +36,13 @@ func (sd *SmartDict) Get(key string) (string, bool) {
 	return val, ok
 }
 
-func (sd *SmartDict) Remove(key string) {
+func (sd *smartDict) Remove(key string) {
 	sd.mu.Lock()
 	defer sd.mu.Unlock()
 
 	delete(sd.Data, key)
+}
+
+var Dict = smartDict{
+	Data: map[string]string{},
 }

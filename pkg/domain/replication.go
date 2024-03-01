@@ -2,33 +2,26 @@ package domain
 
 import (
 	"fmt"
-	"net"
 	"sync"
 )
 
-type Connection struct {
-	Conn      *net.Conn
-	ParsedLen int
-	Type      string
-}
-
-type Replication struct {
+type replication struct {
 	Connections map[string]*Connection
 	mu          sync.Mutex
 }
 
-func (repl *Replication) Add(connection *Connection) {
+func (repl *replication) Add(connection *Connection) {
 	repl.mu.Lock()
 	defer repl.mu.Unlock()
 
-	replicaId := (*connection.Conn).RemoteAddr().String()
+	replicaId := (*connection.Net).RemoteAddr().String()
 
 	if _, ok := repl.Connections[replicaId]; !ok {
 		repl.Connections[replicaId] = connection
 	}
 }
 
-func (repl *Replication) Remove(replicaId string) {
+func (repl *replication) Remove(replicaId string) {
 	repl.mu.Lock()
 	defer repl.mu.Unlock()
 
@@ -37,16 +30,20 @@ func (repl *Replication) Remove(replicaId string) {
 	}
 }
 
-func (repl *Replication) NotifyAllReplicas(currentConnection Connection, command Command) {
+func (repl *replication) NotifyAllReplicas(command Command) {
 	for replicaId, connection := range repl.Connections {
-		if replicaId == (*currentConnection.Conn).RemoteAddr().String() {
+		if replicaId == (*command.Conn.Net).RemoteAddr().String() {
 			continue
 		}
 
-		_, err := (*connection.Conn).Write([]byte(command.Raw))
+		_, err := (*connection.Net).Write([]byte(command.Raw))
 
 		if err != nil {
 			fmt.Println(err.Error())
 		}
 	}
+}
+
+var Replications = replication{
+	Connections: map[string]*Connection{},
 }

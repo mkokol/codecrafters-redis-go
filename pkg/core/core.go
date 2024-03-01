@@ -3,29 +3,10 @@ package core
 import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
-	"math/rand"
 	"net"
 	"os"
 	"strconv"
 )
-
-const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
-
-var Dict = domain.SmartDict{
-	Data: map[string]string{},
-}
-
-var Replications = domain.Replication{
-	Connections: map[string]*domain.Connection{},
-}
-
-func RandStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
 
 func ParseCliParams() domain.Conf {
 	cmdParams := os.Args[1:]
@@ -83,11 +64,11 @@ func HandleClient(
 		if err != nil {
 			fmt.Println("An error occurs during closing connection.")
 		}
-	}(*connection.Conn)
+	}(*connection.Net)
 
 	for {
 		buf := make([]byte, 1024)
-		n, errRead := (*connection.Conn).Read(buf)
+		n, errRead := (*connection.Net).Read(buf)
 
 		if errRead != nil {
 			fmt.Println("Reading Error", errRead.Error())
@@ -95,8 +76,31 @@ func HandleClient(
 			break
 		}
 
-		for _, command := range domain.ParsCommands(buf[:n]) {
-			HandleCommand(connection, command)
+		for _, command := range domain.ParsCommands(buf[:n], connection) {
+			HandleCommand(&command)
 		}
 	}
+}
+
+func HandleCommand(command *domain.Command) {
+	switch command.Cmd {
+	case "ping":
+		command.HandlePingCommand()
+	case "echo":
+		command.HandleEchoCommand()
+	case "set":
+		command.HandleSetCommand()
+	case "get":
+		command.HandleGetCommand()
+	case "info":
+		command.HandleInfoCommand()
+	case "replconf":
+		command.HandleReplConfCommand()
+	case "psync":
+		command.HandlePSyncCommand()
+	default:
+		command.Conn.HandleWrite("*0\r\n")
+	}
+
+	command.Conn.IncreaseOffsetFor(len(command.Raw))
 }

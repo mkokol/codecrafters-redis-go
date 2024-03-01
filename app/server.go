@@ -34,9 +34,8 @@ func main() {
 		}
 
 		go core.HandleClient(&domain.Connection{
-			Conn:      &conn,
-			Type:      "User",
-			ParsedLen: 0,
+			Net:  &conn,
+			Type: "User",
 		})
 	}
 }
