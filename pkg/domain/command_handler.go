@@ -132,5 +132,5 @@ func (c *Command) HandlePSyncCommand() {
 }
 
 func (c *Command) HandleWaitCommand() {
-	c.SendResp(":0\r\n")
+	c.SendResp(fmt.Sprintf(":%d\r\n", Replications.GetNumOfReplicas()))
 }

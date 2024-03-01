@@ -44,6 +44,10 @@ func (repl *replication) NotifyAllReplicas(command Command) {
 	}
 }
 
+func (repl *replication) GetNumOfReplicas() int {
+	return len(repl.Connections)
+}
+
 var Replications = replication{
 	Connections: map[string]*Connection{},
 }
