@@ -98,6 +98,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandleReplConfCommand()
 	case "psync":
 		command.HandlePSyncCommand()
+	case "wait":
+		command.HandleWaitCommand()
 	default:
 		command.Conn.HandleWrite("*0\r\n")
 	}

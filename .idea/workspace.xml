@@ -5,17 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b08443ea-fe28-4be0-8038-506d32117f73" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pkg/domain/command_handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/app/server.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/core/core.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/core/core.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/core/request_handlers.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/core/sync_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/core/sync_client.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pkg/domain/command.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/domain/domain.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/domain/replication.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/replication.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/domain/smart_dict.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/domain/smart_dict.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,6 +22,9 @@
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="2d5RoKDwgXCR0HqkcdY3VuuZwew" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -42,8 +37,15 @@
     <property name="go.format.on.save.advertiser.fired" value="true" />
     <property name="go.formatter.settings.were.checked" value="true" />
     <property name="go.import.settings.migrated" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/pkg/domain" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
     <property name="settings.editor.selected.configurable" value="go.vgo" />
     <property name="vue.rearranger.settings.migration" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/pkg/domain" />
+    </key>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
