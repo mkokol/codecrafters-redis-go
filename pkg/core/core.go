@@ -123,8 +123,8 @@ func ParseRdbFile() {
 	fileData := b.String()
 
 	resideDbPosition := strings.IndexByte(fileData, byte(RESIZE_DB))
-	// 4 is the number of bytes between the fb op and the len of the first key
 
+	// 4 is the number of bytes between the fb op and the len of the first key
 	keyLenPosition := resideDbPosition + 4
 	keyLen := int(fileData[keyLenPosition])
 	key := fileData[keyLenPosition+1 : keyLenPosition+keyLen+1]
