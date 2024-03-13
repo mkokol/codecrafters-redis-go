@@ -18,10 +18,12 @@ type Command struct {
 
 func (c *Command) SendResp(respMessage string) {
 	if c.Conn.Type == "Master" && c.Cmd != "replconf" {
+		fmt.Println("SKIP IT.", strings.ReplaceAll(respMessage, "\r\n", "__"))
+
 		return
 	}
 
-	c.Conn.HandleWrite(respMessage)
+	c.Conn.Write(respMessage)
 }
 
 func (c *Command) HandlePingCommand() {
@@ -50,7 +52,7 @@ func (c *Command) HandleSetCommand() {
 	}
 
 	Dict.Add(key, val, ttlMS)
-	Replications.NotifyAllReplicas(*c)
+	Replications.NotifyAllReplicas(c.Raw)
 
 	c.SendResp("+OK\r\n")
 }
@@ -102,8 +104,23 @@ func (c *Command) HandleInfoCommand() {
 }
 
 func (c *Command) HandleReplConfCommand() {
-	if strings.ToLower(c.Args[0]) == "getack" {
+	action := strings.ToLower(c.Args[0])
+	if action == "getack" {
 		c.SendResp(RedisStringArray([]string{"REPLCONF", "ACK", strconv.Itoa(c.Conn.GetOffset())}))
+
+		return
+	} else if action == "ack" {
+		offset, err := strconv.Atoi(c.Args[1])
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		Replications.Ch <- ReplSync{
+			MsgType: action,
+			ReplId:  (*c.Conn).GetReplId(),
+			Offset:  offset,
+		}
 
 		return
 	}
@@ -112,25 +129,73 @@ func (c *Command) HandleReplConfCommand() {
 }
 
 func (c *Command) HandlePSyncCommand() {
-	if c.Args[0] == "?" {
-		c.SendResp(fmt.Sprintf("+FULLRESYNC %s 0\r\n", RandStringBytes(40)))
+	c.SendResp(fmt.Sprintf("+FULLRESYNC %s 0\r\n", RandStringBytes(40)))
 
-		data, err := base64.StdEncoding.DecodeString("UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==")
+	data, err := base64.StdEncoding.DecodeString("UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==")
 
-		if err != nil {
-			fmt.Println("Can't parse RDB file base64 content: ", err.Error())
-		}
+	if err != nil {
+		fmt.Println("Can't parse RDB file base64 content: ", err.Error())
+	}
 
-		c.SendResp(fmt.Sprintf("$%d\r\n%s", len(data), data))
+	c.SendResp(fmt.Sprintf("$%d\r\n%s", len(data), data))
 
-		Replications.Add(c.Conn)
+	Replications.Add(c.Conn)
+}
+
+func (c *Command) HandleWaitCommand() {
+	replCount, errCount := strconv.Atoi(c.Args[0])
+
+	if errCount != nil {
+		fmt.Println(errCount.Error())
 
 		return
 	}
 
-	c.SendResp("+OK\r\n")
-}
+	replTimeOut, errTimeOut := strconv.Atoi(c.Args[1])
 
-func (c *Command) HandleWaitCommand() {
-	c.SendResp(fmt.Sprintf(":%d\r\n", Replications.GetNumOfReplicas()))
+	if errTimeOut != nil {
+		fmt.Println(errTimeOut.Error())
+
+		return
+	}
+
+	if Replications.InSyncOffset == 0 {
+		inSync := len(Replications.Connections)
+
+		c.SendResp(fmt.Sprintf(":%d\r\n", inSync))
+
+		return
+	}
+
+	Replications.NotifyAllReplicas(
+		RedisStringArray([]string{"REPLCONF", "GETACK", "*"}),
+	)
+
+	timeout := time.NewTimer(time.Duration(replTimeOut) * time.Millisecond)
+	defer timeout.Stop()
+
+	go func() {
+		_ = <-timeout.C
+
+		Replications.Ch <- ReplSync{
+			MsgType: "time_out",
+			Offset:  replTimeOut,
+		}
+	}()
+
+	//replAck := map[string]int{}
+
+	for {
+		replSync := <-Replications.Ch
+
+		if replSync.MsgType == "ack" {
+			Replications.AckStat[replSync.ReplId] = replSync.Offset
+		}
+
+		if replSync.MsgType == "time_out" || Replications.InSyncReplicas() >= replCount {
+			break
+		}
+	}
+
+	c.SendResp(fmt.Sprintf(":%d\r\n", Replications.InSyncReplicas()))
 }

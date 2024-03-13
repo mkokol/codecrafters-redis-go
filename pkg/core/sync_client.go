@@ -28,7 +28,6 @@ func SendHandShake() {
 		Net:  &conn,
 		Type: "Master",
 	}
-	domain.Replications.Add(&connection)
 
 	commands := []string{
 		domain.RedisStringArray([]string{"PING"}),
@@ -40,6 +39,6 @@ func SendHandShake() {
 	go HandleClient(&connection)
 
 	for _, commandMessage := range commands {
-		connection.HandleWrite(commandMessage)
+		connection.Write(commandMessage)
 	}
 }

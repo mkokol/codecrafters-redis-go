@@ -5,38 +5,45 @@ import (
 	"sync"
 )
 
-type replication struct {
-	Connections map[string]*Connection
-	mu          sync.Mutex
+type ReplSync struct {
+	MsgType string
+	ReplId  string
+	Offset  int
 }
 
-func (repl *replication) Add(connection *Connection) {
-	repl.mu.Lock()
-	defer repl.mu.Unlock()
+type replication struct {
+	Connections  map[string]*Connection
+	InSyncOffset int
+	Ch           chan ReplSync
+	AckStat      map[string]int
+	mu           sync.Mutex
+}
+
+func (r *replication) Add(connection *Connection) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	replicaId := (*connection.Net).RemoteAddr().String()
 
-	if _, ok := repl.Connections[replicaId]; !ok {
-		repl.Connections[replicaId] = connection
+	if _, ok := r.Connections[replicaId]; !ok {
+		r.Connections[replicaId] = connection
 	}
 }
 
-func (repl *replication) Remove(replicaId string) {
-	repl.mu.Lock()
-	defer repl.mu.Unlock()
+func (r *replication) Remove(replicaId string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if _, ok := repl.Connections[replicaId]; !ok {
-		delete(repl.Connections, replicaId)
+	if _, ok := r.Connections[replicaId]; !ok {
+		delete(r.Connections, replicaId)
 	}
 }
 
-func (repl *replication) NotifyAllReplicas(command Command) {
-	for replicaId, connection := range repl.Connections {
-		if replicaId == (*command.Conn.Net).RemoteAddr().String() {
-			continue
-		}
+func (r *replication) NotifyAllReplicas(message string) {
+	r.InSyncOffset += len(message)
 
-		_, err := (*connection.Net).Write([]byte(command.Raw))
+	for _, connection := range r.Connections {
+		_, err := (*connection.Net).Write([]byte(message))
 
 		if err != nil {
 			fmt.Println(err.Error())
@@ -44,10 +51,20 @@ func (repl *replication) NotifyAllReplicas(command Command) {
 	}
 }
 
-func (repl *replication) GetNumOfReplicas() int {
-	return len(repl.Connections)
+func (r *replication) InSyncReplicas() int {
+	inSyncCount := 0
+
+	for _, replOffset := range r.AckStat {
+		if replOffset >= r.InSyncOffset {
+			inSyncCount += 1
+		}
+	}
+
+	return inSyncCount
 }
 
 var Replications = replication{
 	Connections: map[string]*Connection{},
+	Ch:          make(chan ReplSync, 256),
+	AckStat:     map[string]int{},
 }

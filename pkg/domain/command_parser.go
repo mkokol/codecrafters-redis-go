@@ -1,11 +1,11 @@
 package domain
 
 import (
+	"fmt"
 	"strings"
 )
 
-func ParsCommands(data []byte, conn *Connection) []Command {
-	message := string(data)
+func ParsCommands(message string, conn *Connection) []Command {
 	var commands []Command
 	i := 0
 
@@ -13,7 +13,8 @@ func ParsCommands(data []byte, conn *Connection) []Command {
 		var params []string
 		start := i
 
-		if message[i] == '*' {
+		switch message[i] {
+		case '*':
 			i++
 			numOfCommands := parseNumber(&i, message)
 
@@ -31,16 +32,18 @@ func ParsCommands(data []byte, conn *Connection) []Command {
 				}
 				numOfCommands--
 			}
-		} else if message[i] == '+' {
+		case '+':
 			for message[i] != '\n' {
 				i += 1
 			}
 			i += 1
-		} else if message[i] == '$' {
+		case '$':
 			// skip data param character
 			i++
 			// jump over data that was pared
 			i += parseNumber(&i, message)
+		default:
+			fmt.Println(">>> I have missed something:", message[i])
 		}
 
 		if len(params) == 0 {

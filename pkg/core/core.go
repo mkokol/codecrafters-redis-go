@@ -67,16 +67,13 @@ func HandleClient(
 	}(*connection.Net)
 
 	for {
-		buf := make([]byte, 1024)
-		n, errRead := (*connection.Net).Read(buf)
+		message, err := (*connection).Read()
 
-		if errRead != nil {
-			fmt.Println("Reading Error", errRead.Error())
-
+		if err != nil {
 			break
 		}
 
-		for _, command := range domain.ParsCommands(buf[:n], connection) {
+		for _, command := range domain.ParsCommands(message, connection) {
 			HandleCommand(&command)
 		}
 	}
@@ -101,7 +98,9 @@ func HandleCommand(command *domain.Command) {
 	case "wait":
 		command.HandleWaitCommand()
 	default:
-		command.Conn.HandleWrite("*0\r\n")
+		fmt.Println("Handle Command:", command.Cmd)
+
+		command.Conn.Write("*0\r\n")
 	}
 
 	command.Conn.IncreaseOffsetFor(len(command.Raw))
