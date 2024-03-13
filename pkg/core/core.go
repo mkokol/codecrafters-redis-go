@@ -32,6 +32,7 @@ func ParseCliParams() domain.Conf {
 			}
 
 			config.OpenPort = openPort
+
 		case "--replicaof", "-replicaof", "--r", "-r":
 			if i+2 >= len(cmdParams) {
 				fmt.Println("Failed to parse parameter:", val)
@@ -50,6 +51,24 @@ func ParseCliParams() domain.Conf {
 
 			config.MasterHost = masterHost
 			config.MasterPort = masterPort
+
+		case "--dir", "-dir":
+			if i+1 >= len(cmdParams) {
+				fmt.Println("Failed to parse parameter:", val)
+
+				os.Exit(1)
+			}
+
+			config.RdbDir = cmdParams[i+1]
+
+		case "--dbfilename", "-dbfilename":
+			if i+1 >= len(cmdParams) {
+				fmt.Println("Failed to parse parameter:", val)
+
+				os.Exit(1)
+			}
+
+			config.RdbFileName = cmdParams[i+1]
 		}
 	}
 
@@ -97,6 +116,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandlePSyncCommand()
 	case "wait":
 		command.HandleWaitCommand()
+	case "config":
+		command.HandleConfigCommand()
 	default:
 		fmt.Println("Handle Command:", command.Cmd)
 

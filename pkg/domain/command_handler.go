@@ -18,8 +18,6 @@ type Command struct {
 
 func (c *Command) SendResp(respMessage string) {
 	if c.Conn.Type == "Master" && c.Cmd != "replconf" {
-		fmt.Println("SKIP IT.", strings.ReplaceAll(respMessage, "\r\n", "__"))
-
 		return
 	}
 
@@ -160,9 +158,7 @@ func (c *Command) HandleWaitCommand() {
 	}
 
 	if Replications.InSyncOffset == 0 {
-		inSync := len(Replications.Connections)
-
-		c.SendResp(fmt.Sprintf(":%d\r\n", inSync))
+		c.SendResp(fmt.Sprintf(":%d\r\n", len(Replications.Connections)))
 
 		return
 	}
@@ -183,8 +179,6 @@ func (c *Command) HandleWaitCommand() {
 		}
 	}()
 
-	//replAck := map[string]int{}
-
 	for {
 		replSync := <-Replications.Ch
 
@@ -198,4 +192,15 @@ func (c *Command) HandleWaitCommand() {
 	}
 
 	c.SendResp(fmt.Sprintf(":%d\r\n", Replications.InSyncReplicas()))
+}
+
+func (c *Command) HandleConfigCommand() {
+	action := strings.ToLower(c.Args[1])
+
+	switch action {
+	case "dir":
+		c.SendResp(RedisStringArray([]string{"dir", Config.RdbDir}))
+	case "dbfilename":
+		c.SendResp(RedisStringArray([]string{"dbfilename", Config.RdbFileName}))
+	}
 }
