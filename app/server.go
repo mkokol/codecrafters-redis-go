@@ -11,6 +11,7 @@ import (
 
 func main() {
 	domain.Config = core.ParseCliParams()
+	core.ParseRdbFile()
 	listenOn := "0.0.0.0:" + strconv.Itoa(domain.Config.OpenPort)
 	listener, err := net.Listen("tcp", listenOn)
 

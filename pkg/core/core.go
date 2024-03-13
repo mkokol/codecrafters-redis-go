@@ -3,10 +3,15 @@ package core
 import (
 	"fmt"
 	"github.com/codecrafters-io/redis-starter-go/pkg/domain"
+	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
+
+const RESIZE_DB = 0xFB
 
 func ParseCliParams() domain.Conf {
 	cmdParams := os.Args[1:]
@@ -75,6 +80,62 @@ func ParseCliParams() domain.Conf {
 	return config
 }
 
+func ParseRdbFile() {
+	conf := domain.Config
+
+	if conf.RdbDir == "" || conf.RdbFileName == "" {
+		return
+	}
+
+	fPointer, err := os.Open(
+		filepath.Join(conf.RdbDir, conf.RdbFileName),
+	)
+
+	if err != nil {
+		fmt.Println("Unable to read file:", err)
+
+		return
+	}
+
+	defer fPointer.Close()
+
+	var b strings.Builder
+	buf := make([]byte, 1024)
+
+	for {
+		n, err := fPointer.Read(buf)
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			fmt.Println("Error to read file:", err.Error())
+
+			continue
+		}
+
+		if n > 0 {
+			b.Write(buf[:n])
+		}
+	}
+
+	fileData := b.String()
+
+	resideDbPosition := strings.IndexByte(fileData, byte(RESIZE_DB))
+	// 4 is the number of bytes between the fb op and the len of the first key
+
+	keyLenPosition := resideDbPosition + 4
+	keyLen := int(fileData[keyLenPosition])
+	key := fileData[keyLenPosition+1 : keyLenPosition+keyLen+1]
+
+	valLenPosition := keyLenPosition + keyLen + 1
+	valLen := int(fileData[valLenPosition])
+	val := fileData[valLenPosition+1 : valLenPosition+valLen+1]
+
+	domain.Dict.Add(key, val, -1)
+}
+
 func HandleClient(
 	connection *domain.Connection,
 ) {
@@ -108,6 +169,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandleSetCommand()
 	case "get":
 		command.HandleGetCommand()
+	case "keys":
+		command.HandleKeysCommand()
 	case "info":
 		command.HandleInfoCommand()
 	case "replconf":

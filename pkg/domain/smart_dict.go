@@ -43,6 +43,13 @@ func (sd *smartDict) Remove(key string) {
 	delete(sd.Data, key)
 }
 
+func (sd *smartDict) Size() int {
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
+	return len(sd.Data)
+}
+
 var Dict = smartDict{
 	Data: map[string]string{},
 }

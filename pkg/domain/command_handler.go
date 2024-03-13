@@ -70,6 +70,18 @@ func (c *Command) HandleGetCommand() {
 	c.SendResp("$-1\r\n")
 }
 
+func (c *Command) HandleKeysCommand() {
+	keys := make([]string, Dict.Size())
+	i := 0
+
+	for key, _ := range Dict.Data {
+		keys[i] = key
+		i++
+	}
+
+	c.SendResp(RedisStringArray(keys))
+}
+
 func (c *Command) HandleInfoCommand() {
 	params := map[string]string{}
 
