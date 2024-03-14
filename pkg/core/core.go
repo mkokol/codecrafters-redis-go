@@ -11,7 +11,10 @@ import (
 	"strings"
 )
 
-const RESIZE_DB = 0xFB
+const (
+	RESIZE_DB = 0xFB
+	DB_END    = 0xFF
+)
 
 func ParseCliParams() domain.Conf {
 	cmdParams := os.Args[1:]
@@ -121,19 +124,23 @@ func ParseRdbFile() {
 	}
 
 	fileData := b.String()
-
 	resideDbPosition := strings.IndexByte(fileData, byte(RESIZE_DB))
-
+	size := int(fileData[resideDbPosition+1])
 	// 4 is the number of bytes between the fb op and the len of the first key
-	keyLenPosition := resideDbPosition + 4
-	keyLen := int(fileData[keyLenPosition])
-	key := fileData[keyLenPosition+1 : keyLenPosition+keyLen+1]
+	start := resideDbPosition + 4
 
-	valLenPosition := keyLenPosition + keyLen + 1
-	valLen := int(fileData[valLenPosition])
-	val := fileData[valLenPosition+1 : valLenPosition+valLen+1]
+	for i := 0; i < size; i++ {
+		keyLen := int(fileData[start])
+		key := fileData[start+1 : start+keyLen+1]
 
-	domain.Dict.Add(key, val, -1)
+		valLenPosition := start + keyLen + 1
+		valLen := int(fileData[valLenPosition])
+		val := fileData[valLenPosition+1 : valLenPosition+valLen+1]
+		start = valLenPosition + valLen + 2
+
+		fmt.Println("SET", key, val)
+		domain.Dict.Add(key, val, -1)
+	}
 }
 
 func HandleClient(
