@@ -13,7 +13,6 @@ import (
 
 const (
 	RESIZE_DB = 0xFB
-	DB_END    = 0xFF
 )
 
 func ParseCliParams() domain.Conf {
@@ -133,12 +132,11 @@ func ParseRdbFile() {
 		keyLen := int(fileData[start])
 		key := fileData[start+1 : start+keyLen+1]
 
-		valLenPosition := start + keyLen + 1
-		valLen := int(fileData[valLenPosition])
-		val := fileData[valLenPosition+1 : valLenPosition+valLen+1]
-		start = valLenPosition + valLen + 2
+		start += keyLen + 1
+		valLen := int(fileData[start])
+		val := fileData[start+1 : start+valLen+1]
+		start += valLen + 2
 
-		fmt.Println("SET", key, val)
 		domain.Dict.Add(key, val, -1)
 	}
 }
