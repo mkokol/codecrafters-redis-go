@@ -9,9 +9,7 @@ import (
 )
 
 func SendHandShake() {
-	if domain.Config.MasterHost == "" {
-		fmt.Println("There is no master conf")
-
+	if domain.Config.MasterHost == "" || domain.Config.MasterPort == 0 {
 		return
 	}
 
