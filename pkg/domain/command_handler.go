@@ -216,3 +216,13 @@ func (c *Command) HandleConfigCommand() {
 		c.SendResp(RedisStringArray([]string{"dbfilename", Config.RdbFileName}))
 	}
 }
+
+func (c *Command) HandleTypeCommand() {
+	valType := "none"
+
+	if _, ok := Dict.Get(c.Args[0]); ok {
+		valType = "string"
+	}
+
+	c.SendResp(fmt.Sprintf("+%s\r\n", valType))
+}

@@ -120,6 +120,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandleWaitCommand()
 	case "config":
 		command.HandleConfigCommand()
+	case "type":
+		command.HandleTypeCommand()
 	default:
 		fmt.Println("Handle Command:", command.Cmd)
 
