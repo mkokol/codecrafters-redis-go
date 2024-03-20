@@ -6,8 +6,14 @@ import (
 )
 
 type smartDict struct {
-	Data map[string]string
-	mu   sync.Mutex
+	Data   map[string]string
+	Stream map[string]StreamRecord
+	mu     sync.Mutex
+}
+
+type StreamRecord struct {
+	RecordId string
+	Data     map[string]string
 }
 
 func (sd *smartDict) Add(key string, val string, ttlMS int) {
@@ -50,6 +56,23 @@ func (sd *smartDict) Size() int {
 	return len(sd.Data)
 }
 
+func (sd *smartDict) XAdd(key string, val StreamRecord) {
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
+	sd.Stream[key] = val
+}
+
+func (sd *smartDict) XGet(key string) (StreamRecord, bool) {
+	sd.mu.Lock()
+	defer sd.mu.Unlock()
+
+	val, ok := sd.Stream[key]
+
+	return val, ok
+}
+
 var Dict = smartDict{
-	Data: map[string]string{},
+	Data:   map[string]string{},
+	Stream: map[string]StreamRecord{},
 }

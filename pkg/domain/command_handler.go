@@ -224,5 +224,31 @@ func (c *Command) HandleTypeCommand() {
 		valType = "string"
 	}
 
+	if _, ok := Dict.XGet(c.Args[0]); ok {
+		valType = "stream"
+	}
+
 	c.SendResp(fmt.Sprintf("+%s\r\n", valType))
+}
+
+func (c *Command) HandleXAddCommand() {
+	key := c.Args[0]
+	streamId := c.Args[1]
+
+	data := map[string]string{}
+	i := 2
+
+	for i < len(c.Args) {
+		data[c.Args[i]] = c.Args[i+1]
+		i += 2
+	}
+
+	record := StreamRecord{
+		RecordId: streamId,
+		Data:     data,
+	}
+
+	Dict.XAdd(key, record)
+
+	c.SendResp(fmt.Sprintf("$%d\r\n%s\r\n", len(streamId), streamId))
 }

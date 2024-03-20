@@ -122,6 +122,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandleConfigCommand()
 	case "type":
 		command.HandleTypeCommand()
+	case "xadd":
+		command.HandleXAddCommand()
 	default:
 		fmt.Println("Handle Command:", command.Cmd)
 
