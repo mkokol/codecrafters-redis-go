@@ -35,7 +35,44 @@ func (ss *smartStream) Get(key string) ([]StreamRecord, bool) {
 	return val, ok
 }
 
+func (ss *smartStream) BuildStreamId(currentStreamId string) string {
+	if !strings.Contains(currentStreamId, "*") {
+		return currentStreamId
+	}
+
+	if currentStreamId == "*" {
+		return "TODO"
+	}
+
+	lastStreamId := "0-0"
+
+	if len(ss.Order) > 0 {
+		lastStreamId = ss.Order[len(ss.Order)-1]
+	}
+
+	lastStreamIdParts := strings.Split(lastStreamId, "-")
+	currentStreamIddParts := strings.Split(currentStreamId, "-")
+
+	if lastStreamIdParts[0] != currentStreamIddParts[0] {
+		return currentStreamIddParts[0] + "-0"
+	}
+
+	lastID, err := strconv.Atoi(lastStreamIdParts[1])
+
+	if err != nil {
+		fmt.Println(err.Error())
+
+		return ""
+	}
+
+	return currentStreamIddParts[0] + "-" + strconv.Itoa(lastID+1)
+}
+
 func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
+	if currentStreamId == "*" {
+		return true
+	}
+
 	lastStreamId := "0-0"
 
 	if len(ss.Order) > 0 {
@@ -53,7 +90,7 @@ func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
 		return false
 	}
 
-	lastID, err := strconv.Atoi(lastStreamIdParts[1])
+	currentTS, err := strconv.Atoi(currentStreamIddParts[0])
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -61,7 +98,15 @@ func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
 		return false
 	}
 
-	currentTS, err := strconv.Atoi(currentStreamIddParts[0])
+	if currentTS < lastTS {
+		return false
+	}
+
+	if currentStreamIddParts[1] == "*" {
+		return true
+	}
+
+	lastID, err := strconv.Atoi(lastStreamIdParts[1])
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -74,10 +119,6 @@ func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
 	if err != nil {
 		fmt.Println(err.Error())
 
-		return false
-	}
-
-	if currentTS < lastTS {
 		return false
 	}
 

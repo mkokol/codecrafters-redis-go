@@ -247,6 +247,7 @@ func (c *Command) HandleXAddCommand() {
 		return
 	}
 
+	streamId = Stream.BuildStreamId(streamId)
 	data := map[string]string{}
 	i := 2
 
