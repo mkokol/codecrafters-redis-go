@@ -224,7 +224,7 @@ func (c *Command) HandleTypeCommand() {
 		valType = "string"
 	}
 
-	if _, ok := Dict.XGet(c.Args[0]); ok {
+	if _, ok := Stream.Get(c.Args[0]); ok {
 		valType = "stream"
 	}
 
@@ -234,6 +234,18 @@ func (c *Command) HandleTypeCommand() {
 func (c *Command) HandleXAddCommand() {
 	key := c.Args[0]
 	streamId := c.Args[1]
+
+	if !Stream.ValidateStreamId(streamId) {
+		errorMessage := "ERR The ID specified in XADD is equal or smaller than the target stream top item"
+
+		if streamId == "0-0" {
+			errorMessage = "ERR The ID specified in XADD must be greater than 0-0"
+		}
+
+		c.SendResp(fmt.Sprintf("-%s\r\n", errorMessage))
+
+		return
+	}
 
 	data := map[string]string{}
 	i := 2
@@ -248,7 +260,7 @@ func (c *Command) HandleXAddCommand() {
 		Data:     data,
 	}
 
-	Dict.XAdd(key, record)
+	Stream.Add(key, record)
 
 	c.SendResp(fmt.Sprintf("$%d\r\n%s\r\n", len(streamId), streamId))
 }
