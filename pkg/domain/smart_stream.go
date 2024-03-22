@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type smartStream struct {
@@ -41,7 +42,7 @@ func (ss *smartStream) BuildStreamId(currentStreamId string) string {
 	}
 
 	if currentStreamId == "*" {
-		return "TODO"
+		return fmt.Sprintf("%d-0", time.Now().UnixMilli())
 	}
 
 	lastStreamId := "0-0"
