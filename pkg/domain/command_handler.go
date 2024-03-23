@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -280,7 +281,10 @@ func (c *Command) HandleXRangeCommand() {
 		startTS, startID = ParsStreamId(c.Args[1])
 	}
 
-	endTS, endID := ParsStreamId(c.Args[2])
+	endTS, endID := int64(math.MaxInt64), math.MaxInt32
+	if c.Args[2] != "+" {
+		endTS, endID = ParsStreamId(c.Args[2])
+	}
 
 	out := []string{}
 
