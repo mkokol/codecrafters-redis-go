@@ -270,12 +270,17 @@ func (c *Command) HandleXAddCommand() {
 func (c *Command) HandleXRangeCommand() {
 	key := c.Args[0]
 	ds, ok := Stream.Get(key)
-	startTS, startID := ParsStreamId(c.Args[1])
-	endTS, endID := ParsStreamId(c.Args[2])
 
 	if !ok {
 		return
 	}
+
+	startTS, startID := int64(0), 0
+	if c.Args[1] != "-" {
+		startTS, startID = ParsStreamId(c.Args[1])
+	}
+
+	endTS, endID := ParsStreamId(c.Args[2])
 
 	out := []string{}
 
