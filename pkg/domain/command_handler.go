@@ -235,7 +235,7 @@ func (c *Command) HandleXAddCommand() {
 	key := c.Args[0]
 	streamId := c.Args[1]
 
-	if !Stream.ValidateStreamId(streamId) {
+	if !Stream.ValidateStreamId(key, streamId) {
 		errorMessage := "ERR The ID specified in XADD is equal or smaller than the target stream top item"
 
 		if streamId == "0-0" {
@@ -247,7 +247,8 @@ func (c *Command) HandleXAddCommand() {
 		return
 	}
 
-	streamId = Stream.BuildStreamId(streamId)
+	streamId = Stream.BuildStreamId(key, streamId)
+
 	data := map[string]string{}
 	i := 2
 
@@ -264,4 +265,53 @@ func (c *Command) HandleXAddCommand() {
 	Stream.Add(key, record)
 
 	c.SendResp(fmt.Sprintf("$%d\r\n%s\r\n", len(streamId), streamId))
+}
+
+func (c *Command) HandleXRangeCommand() {
+	key := c.Args[0]
+	ds, ok := Stream.Get(key)
+	startTS, startID := ParsStreamId(c.Args[1])
+	endTS, endID := ParsStreamId(c.Args[2])
+
+	if !ok {
+		return
+	}
+
+	out := []string{}
+
+	for _, streamTS := range ds.StreamOrder.IdsOrder {
+		if streamTS < startTS || streamTS > endTS {
+			continue
+		}
+
+		for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
+			if (streamTS == 0 && streamID == 0) || streamID < startID || streamID > endID {
+				continue
+			}
+
+			streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
+			data := []string{}
+
+			for k, v := range ds.Data[streamId].Data {
+				data = append(data, k, v)
+			}
+
+			out = append(
+				out,
+				fmt.Sprintf(
+					"*2\r\n%s\r\n%s",
+					fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
+					RedisStringArray(data),
+				),
+			)
+		}
+	}
+
+	c.SendResp(
+		fmt.Sprintf(
+			"*%d\r\n%s",
+			len(out),
+			strings.Join(out, ""),
+		),
+	)
 }

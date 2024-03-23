@@ -8,35 +8,68 @@ import (
 	"time"
 )
 
-type smartStream struct {
-	Data  map[string][]StreamRecord
-	Order []string
-	mu    sync.Mutex
-}
-
 type StreamRecord struct {
 	RecordId string
 	Data     map[string]string
+}
+
+type streamOrder struct {
+	IdsOrder  []int64
+	IdsStruct map[int64][]int
+}
+
+func (so *streamOrder) Append(recordId string) {
+	streamTS, streamID := ParsStreamId(recordId)
+
+	if len(so.IdsOrder) == 0 || so.IdsOrder[len(so.IdsOrder)-1] != streamTS {
+		so.IdsOrder = append(so.IdsOrder, streamTS)
+	}
+
+	so.IdsStruct[streamTS] = append(so.IdsStruct[streamTS], streamID)
+}
+
+type StreamDataSet struct {
+	Data        map[string]StreamRecord
+	StreamOrder streamOrder
+}
+
+func (sds *StreamDataSet) Add(val StreamRecord) {
+	sds.Data[val.RecordId] = val
+	sds.StreamOrder.Append(val.RecordId)
+}
+
+type smartStream struct {
+	DataSet map[string]*StreamDataSet
+	mu      sync.Mutex
 }
 
 func (ss *smartStream) Add(key string, val StreamRecord) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
-	ss.Data[key] = append(ss.Data[key], val)
-	ss.Order = append(ss.Order, val.RecordId)
+	if _, ok := ss.DataSet[key]; !ok {
+		ss.DataSet[key] = &StreamDataSet{
+			Data: map[string]StreamRecord{},
+			StreamOrder: streamOrder{
+				IdsOrder:  []int64{0},
+				IdsStruct: map[int64][]int{0: {0}},
+			},
+		}
+	}
+
+	ss.DataSet[key].Add(val)
 }
 
-func (ss *smartStream) Get(key string) ([]StreamRecord, bool) {
+func (ss *smartStream) Get(key string) (*StreamDataSet, bool) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
-	val, ok := ss.Data[key]
+	val, ok := ss.DataSet[key]
 
 	return val, ok
 }
 
-func (ss *smartStream) BuildStreamId(currentStreamId string) string {
+func (ss *smartStream) BuildStreamId(streamKey string, currentStreamId string) string {
 	if !strings.Contains(currentStreamId, "*") {
 		return currentStreamId
 	}
@@ -45,82 +78,52 @@ func (ss *smartStream) BuildStreamId(currentStreamId string) string {
 		return fmt.Sprintf("%d-0", time.Now().UnixMilli())
 	}
 
-	lastStreamId := "0-0"
+	lastTS := int64(0)
+	lastID := 0
+	ds, ok := ss.Get(streamKey)
 
-	if len(ss.Order) > 0 {
-		lastStreamId = ss.Order[len(ss.Order)-1]
+	if ok {
+		idsOrder := ds.StreamOrder.IdsOrder
+		lastTS = idsOrder[len(idsOrder)-1]
+
+		idsStruct := ds.StreamOrder.IdsStruct
+		lastID = idsStruct[lastTS][len(idsStruct[lastTS])-1]
 	}
 
-	lastStreamIdParts := strings.Split(lastStreamId, "-")
-	currentStreamIddParts := strings.Split(currentStreamId, "-")
+	currentTS, _ := ParsStreamId(currentStreamId)
 
-	if lastStreamIdParts[0] != currentStreamIddParts[0] {
-		return currentStreamIddParts[0] + "-0"
+	if lastTS != currentTS {
+		return fmt.Sprintf("%d-0", currentTS)
 	}
 
-	lastID, err := strconv.Atoi(lastStreamIdParts[1])
-
-	if err != nil {
-		fmt.Println(err.Error())
-
-		return ""
-	}
-
-	return currentStreamIddParts[0] + "-" + strconv.Itoa(lastID+1)
+	return fmt.Sprintf("%d-%d", currentTS, lastID+1)
 }
 
-func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
+func (ss *smartStream) ValidateStreamId(streamKey string, currentStreamId string) bool {
 	if currentStreamId == "*" {
 		return true
 	}
 
-	lastStreamId := "0-0"
+	ds, ok := ss.Get(streamKey)
 
-	if len(ss.Order) > 0 {
-		lastStreamId = ss.Order[len(ss.Order)-1]
+	if !ok {
+		return true
 	}
 
-	lastStreamIdParts := strings.Split(lastStreamId, "-")
-	currentStreamIddParts := strings.Split(currentStreamId, "-")
+	idsOrder := ds.StreamOrder.IdsOrder
+	lastTS := idsOrder[len(idsOrder)-1]
 
-	lastTS, err := strconv.Atoi(lastStreamIdParts[0])
+	idsStruct := ds.StreamOrder.IdsStruct
+	lastID := idsStruct[lastTS][len(idsStruct[lastTS])-1]
 
-	if err != nil {
-		fmt.Println(err.Error())
-
-		return false
-	}
-
-	currentTS, err := strconv.Atoi(currentStreamIddParts[0])
-
-	if err != nil {
-		fmt.Println(err.Error())
-
-		return false
-	}
+	currentTS, currentID := ParsStreamId(currentStreamId)
 
 	if currentTS < lastTS {
 		return false
 	}
 
-	if currentStreamIddParts[1] == "*" {
+	if currentID == -1 {
 		return true
-	}
-
-	lastID, err := strconv.Atoi(lastStreamIdParts[1])
-
-	if err != nil {
-		fmt.Println(err.Error())
-
-		return false
-	}
-
-	currentID, err := strconv.Atoi(currentStreamIddParts[1])
-
-	if err != nil {
-		fmt.Println(err.Error())
-
-		return false
 	}
 
 	if currentTS == lastTS && currentID <= lastID {
@@ -130,6 +133,23 @@ func (ss *smartStream) ValidateStreamId(currentStreamId string) bool {
 	return true
 }
 
+func ParsStreamId(streamId string) (int64, int) {
+	streamIdParts := strings.Split(streamId, "-")
+	ts, err := strconv.ParseInt(streamIdParts[0], 10, 64)
+
+	if err != nil {
+		return -1, -1
+	}
+
+	id, err := strconv.Atoi(streamIdParts[1])
+
+	if err != nil {
+		return ts, -1
+	}
+
+	return ts, id
+}
+
 var Stream = smartStream{
-	Data: map[string][]StreamRecord{},
+	DataSet: map[string]*StreamDataSet{},
 }
