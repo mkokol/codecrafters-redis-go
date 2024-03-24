@@ -294,7 +294,15 @@ func (c *Command) HandleXRangeCommand() {
 		}
 
 		for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
-			if (streamTS == 0 && streamID == 0) || streamID < startID || streamID > endID {
+			if streamTS == 0 && streamID == 0 {
+				continue
+			}
+
+			if streamTS == startTS && streamID < startID {
+				continue
+			}
+
+			if streamTS == endTS && streamID > endID {
 				continue
 			}
 
@@ -323,4 +331,59 @@ func (c *Command) HandleXRangeCommand() {
 			strings.Join(out, ""),
 		),
 	)
+}
+
+func (c *Command) HandleXReadCommand() {
+	key := c.Args[1]
+
+	ds, ok := Stream.Get(key)
+
+	if !ok {
+		return
+	}
+
+	startTS, startID := ParsStreamId(c.Args[2])
+	out := []string{}
+
+	for _, streamTS := range ds.StreamOrder.IdsOrder {
+		if streamTS < startTS {
+			continue
+		}
+
+		for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
+			if streamTS == 0 && streamID == 0 {
+				continue
+			}
+
+			if streamTS == startTS && streamID < startID {
+				continue
+			}
+
+			streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
+			data := []string{}
+
+			for k, v := range ds.Data[streamId].Data {
+				data = append(data, k, v)
+			}
+
+			out = append(
+				out,
+				fmt.Sprintf(
+					"*2\r\n%s\r\n%s",
+					fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
+					RedisStringArray(data),
+				),
+			)
+		}
+	}
+
+	c.SendResp(fmt.Sprintf(
+		"*1\r\n*2\r\n%s\r\n%s",
+		fmt.Sprintf("$%d\r\n%s", len(key), key),
+		fmt.Sprintf(
+			"*%d\r\n%s",
+			len(out),
+			strings.Join(out, ""),
+		),
+	))
 }

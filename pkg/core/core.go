@@ -126,6 +126,8 @@ func HandleCommand(command *domain.Command) {
 		command.HandleXAddCommand()
 	case "xrange":
 		command.HandleXRangeCommand()
+	case "xread":
+		command.HandleXReadCommand()
 	default:
 		fmt.Println("Handle Command:", command.Cmd)
 
