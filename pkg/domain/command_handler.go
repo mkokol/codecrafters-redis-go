@@ -334,56 +334,70 @@ func (c *Command) HandleXRangeCommand() {
 }
 
 func (c *Command) HandleXReadCommand() {
-	key := c.Args[1]
-
-	ds, ok := Stream.Get(key)
-
-	if !ok {
-		return
-	}
-
-	startTS, startID := ParsStreamId(c.Args[2])
+	searchParams := c.Args[1:]
 	out := []string{}
+	median := len(searchParams) / 2
 
-	for _, streamTS := range ds.StreamOrder.IdsOrder {
-		if streamTS < startTS {
-			continue
+	for i := 0; i+median < len(searchParams); i++ {
+		key := searchParams[i]
+
+		ds, ok := Stream.Get(key)
+
+		if !ok {
+			return
 		}
 
-		for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
-			if streamTS == 0 && streamID == 0 {
+		startTS, startID := ParsStreamId(searchParams[i+median])
+		streamOut := []string{}
+
+		for _, streamTS := range ds.StreamOrder.IdsOrder {
+			if streamTS < startTS {
 				continue
 			}
 
-			if streamTS == startTS && streamID < startID {
-				continue
+			for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
+				if streamTS == 0 && streamID == 0 {
+					continue
+				}
+
+				if streamTS == startTS && streamID < startID {
+					continue
+				}
+
+				streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
+				data := []string{}
+
+				for k, v := range ds.Data[streamId].Data {
+					data = append(data, k, v)
+				}
+
+				streamOut = append(
+					streamOut,
+					fmt.Sprintf(
+						"*2\r\n%s\r\n%s",
+						fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
+						RedisStringArray(data),
+					),
+				)
 			}
-
-			streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
-			data := []string{}
-
-			for k, v := range ds.Data[streamId].Data {
-				data = append(data, k, v)
-			}
-
-			out = append(
-				out,
+		}
+		out = append(
+			out,
+			fmt.Sprintf(
+				"*2\r\n%s\r\n%s",
+				fmt.Sprintf("$%d\r\n%s", len(key), key),
 				fmt.Sprintf(
-					"*2\r\n%s\r\n%s",
-					fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
-					RedisStringArray(data),
+					"*%d\r\n%s",
+					len(streamOut),
+					strings.Join(streamOut, ""),
 				),
-			)
-		}
+			),
+		)
 	}
 
 	c.SendResp(fmt.Sprintf(
-		"*1\r\n*2\r\n%s\r\n%s",
-		fmt.Sprintf("$%d\r\n%s", len(key), key),
-		fmt.Sprintf(
-			"*%d\r\n%s",
-			len(out),
-			strings.Join(out, ""),
-		),
+		"*%d\r\n%s",
+		len(out),
+		strings.Join(out, ""),
 	))
 }
