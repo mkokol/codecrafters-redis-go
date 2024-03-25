@@ -325,8 +325,14 @@ func (c *Command) HandleXReadCommand() {
 	streamRecords := map[string][]StreamRecord{}
 
 	for i := 0; i+median < len(searchData); i++ {
+		startAt := searchData[i+median]
+
+		if searchData[i+median] == "$" {
+			startAt = "-"
+		}
+
 		streamsParam[searchData[i]] = StreamSearchRange{
-			StartAtId: searchData[i+median],
+			StartAtId: startAt,
 			EndAtId:   "+",
 		}
 	}
