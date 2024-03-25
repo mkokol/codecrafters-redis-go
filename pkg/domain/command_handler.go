@@ -355,14 +355,16 @@ func (c *Command) HandleXReadCommand() {
 
 		streamRecords = map[string][]StreamRecord{}
 
-		timeout := time.NewTimer(time.Duration(replTimeOut) * time.Millisecond)
-		defer timeout.Stop()
+		if replTimeOut != 0 {
+			timeout := time.NewTimer(time.Duration(replTimeOut) * time.Millisecond)
+			defer timeout.Stop()
 
-		go func() {
-			_ = <-timeout.C
+			go func() {
+				_ = <-timeout.C
 
-			Stream.Ch <- "time_out"
-		}()
+				Stream.Ch <- "time_out"
+			}()
+		}
 
 		for {
 			waitStat := <-Stream.Ch
