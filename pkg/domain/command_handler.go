@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -264,61 +263,39 @@ func (c *Command) HandleXAddCommand() {
 	}
 
 	Stream.Add(key, record)
+	Stream.Ch <- "update"
+
+	fmt.Println("XADD", key, record, Stream.DataSet[key])
 
 	c.SendResp(fmt.Sprintf("$%d\r\n%s\r\n", len(streamId), streamId))
 }
 
 func (c *Command) HandleXRangeCommand() {
-	key := c.Args[0]
-	ds, ok := Stream.Get(key)
-
-	if !ok {
-		return
+	streamsParam := map[string]StreamSearchRange{
+		c.Args[0]: {
+			StartAtId: c.Args[1],
+			EndAtId:   c.Args[2],
+		},
 	}
 
-	startTS, startID := int64(0), 0
-	if c.Args[1] != "-" {
-		startTS, startID = ParsStreamId(c.Args[1])
-	}
+	streamRecords := Stream.GetStreamsRecords(streamsParam)
 
-	endTS, endID := int64(math.MaxInt64), math.MaxInt32
-	if c.Args[2] != "+" {
-		endTS, endID = ParsStreamId(c.Args[2])
-	}
+	var out []string
 
-	out := []string{}
+	for _, records := range streamRecords {
+		for _, record := range records {
+			var recordData []string
 
-	for _, streamTS := range ds.StreamOrder.IdsOrder {
-		if streamTS < startTS || streamTS > endTS {
-			continue
-		}
-
-		for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
-			if streamTS == 0 && streamID == 0 {
-				continue
-			}
-
-			if streamTS == startTS && streamID < startID {
-				continue
-			}
-
-			if streamTS == endTS && streamID > endID {
-				continue
-			}
-
-			streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
-			data := []string{}
-
-			for k, v := range ds.Data[streamId].Data {
-				data = append(data, k, v)
+			for k, v := range record.Data {
+				recordData = append(recordData, k, v)
 			}
 
 			out = append(
 				out,
 				fmt.Sprintf(
 					"*2\r\n%s\r\n%s",
-					fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
-					RedisStringArray(data),
+					fmt.Sprintf("$%d\r\n%s", len(record.RecordId), record.RecordId),
+					RedisStringArray(recordData),
 				),
 			)
 		}
@@ -334,58 +311,113 @@ func (c *Command) HandleXRangeCommand() {
 }
 
 func (c *Command) HandleXReadCommand() {
-	searchParams := c.Args[1:]
-	out := []string{}
-	median := len(searchParams) / 2
+	readType := c.Args[0]
 
-	for i := 0; i+median < len(searchParams); i++ {
-		key := searchParams[i]
+	searchData := c.Args[1:]
 
-		ds, ok := Stream.Get(key)
+	if readType == "block" {
+		searchData = c.Args[3:]
+	}
 
-		if !ok {
+	median := len(searchData) / 2
+
+	streamsParam := map[string]StreamSearchRange{}
+	streamRecords := map[string][]StreamRecord{}
+
+	for i := 0; i+median < len(searchData); i++ {
+		streamsParam[searchData[i]] = StreamSearchRange{
+			StartAtId: searchData[i+median],
+			EndAtId:   "+",
+		}
+	}
+
+	if readType == "streams" {
+		streamRecords = Stream.GetStreamsRecords(streamsParam)
+	} else if readType == "block" {
+		replTimeOut, errTimeOut := strconv.Atoi(c.Args[1])
+
+		if errTimeOut != nil {
+			fmt.Println(errTimeOut.Error())
+
 			return
 		}
 
-		startTS, startID := ParsStreamId(searchParams[i+median])
-		streamOut := []string{}
+		streamRecords = Stream.GetStreamsRecords(streamsParam)
 
-		for _, streamTS := range ds.StreamOrder.IdsOrder {
-			if streamTS < startTS {
-				continue
-			}
+		for streamKey, records := range streamRecords {
+			streamTS, streamID := ParsStreamId(records[len(records)-1].RecordId)
 
-			for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
-				if streamTS == 0 && streamID == 0 {
-					continue
-				}
-
-				if streamTS == startTS && streamID < startID {
-					continue
-				}
-
-				streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
-				data := []string{}
-
-				for k, v := range ds.Data[streamId].Data {
-					data = append(data, k, v)
-				}
-
-				streamOut = append(
-					streamOut,
-					fmt.Sprintf(
-						"*2\r\n%s\r\n%s",
-						fmt.Sprintf("$%d\r\n%s", len(streamId), streamId),
-						RedisStringArray(data),
-					),
-				)
+			streamsParam[streamKey] = StreamSearchRange{
+				StartAtId: fmt.Sprintf("%d-%d", streamTS, streamID+1),
+				EndAtId:   "+",
 			}
 		}
+
+		streamRecords = map[string][]StreamRecord{}
+
+		timeout := time.NewTimer(time.Duration(replTimeOut) * time.Millisecond)
+		defer timeout.Stop()
+
+		go func() {
+			_ = <-timeout.C
+
+			Stream.Ch <- "time_out"
+		}()
+
+		for {
+			waitStat := <-Stream.Ch
+
+			if waitStat == "update" {
+				streamRecords = Stream.GetStreamsRecords(streamsParam)
+
+				if len(streamRecords) > 0 {
+					break
+				}
+			}
+
+			if waitStat == "time_out" {
+				break
+			}
+		}
+	} else {
+		fmt.Println("Request type is not supported:", readType)
+
+		return
+	}
+
+	var out []string
+
+	for i := 0; i+median < len(searchData); i++ {
+		streamKey := searchData[i]
+		records, ok := streamRecords[streamKey]
+
+		if !ok {
+			continue
+		}
+
+		var streamOut []string
+		for _, record := range records {
+			var recordData []string
+
+			for k, v := range record.Data {
+				recordData = append(recordData, k, v)
+			}
+
+			streamOut = append(
+				streamOut,
+				fmt.Sprintf(
+					"*2\r\n%s\r\n%s",
+					fmt.Sprintf("$%d\r\n%s", len(record.RecordId), record.RecordId),
+					RedisStringArray(recordData),
+				),
+			)
+		}
+
 		out = append(
 			out,
 			fmt.Sprintf(
 				"*2\r\n%s\r\n%s",
-				fmt.Sprintf("$%d\r\n%s", len(key), key),
+				fmt.Sprintf("$%d\r\n%s", len(streamKey), streamKey),
 				fmt.Sprintf(
 					"*%d\r\n%s",
 					len(streamOut),
@@ -395,9 +427,13 @@ func (c *Command) HandleXReadCommand() {
 		)
 	}
 
-	c.SendResp(fmt.Sprintf(
-		"*%d\r\n%s",
-		len(out),
-		strings.Join(out, ""),
-	))
+	if len(out) > 0 {
+		c.SendResp(fmt.Sprintf(
+			"*%d\r\n%s",
+			len(out),
+			strings.Join(out, ""),
+		))
+	} else {
+		c.SendResp("$-1\r\n")
+	}
 }

@@ -2,11 +2,17 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+type StreamSearchRange struct {
+	StartAtId string
+	EndAtId   string
+}
 
 type StreamRecord struct {
 	RecordId string
@@ -18,7 +24,7 @@ type streamOrder struct {
 	IdsStruct map[int64][]int
 }
 
-func (so *streamOrder) Append(recordId string) {
+func (so *streamOrder) append(recordId string) {
 	streamTS, streamID := ParsStreamId(recordId)
 
 	if len(so.IdsOrder) == 0 || so.IdsOrder[len(so.IdsOrder)-1] != streamTS {
@@ -35,11 +41,12 @@ type StreamDataSet struct {
 
 func (sds *StreamDataSet) Add(val StreamRecord) {
 	sds.Data[val.RecordId] = val
-	sds.StreamOrder.Append(val.RecordId)
+	sds.StreamOrder.append(val.RecordId)
 }
 
 type smartStream struct {
 	DataSet map[string]*StreamDataSet
+	Ch      chan string
 	mu      sync.Mutex
 }
 
@@ -150,6 +157,71 @@ func ParsStreamId(streamId string) (int64, int) {
 	return ts, id
 }
 
+func (ss *smartStream) GetStreamsRecords(streams map[string]StreamSearchRange) map[string][]StreamRecord {
+	outData := map[string][]StreamRecord{}
+
+	for key, searchRange := range streams {
+		ds, ok := Stream.Get(key)
+
+		if !ok {
+			continue
+		}
+
+		startTS, startID := int64(0), 0
+		if searchRange.StartAtId != "-" {
+			startTS, startID = ParsStreamId(searchRange.StartAtId)
+		}
+
+		endTS, endID := int64(math.MaxInt64), math.MaxInt32
+		if searchRange.EndAtId != "+" {
+			endTS, endID = ParsStreamId(searchRange.EndAtId)
+		}
+
+		var streamData []StreamRecord
+
+		for _, streamTS := range ds.StreamOrder.IdsOrder {
+			if streamTS < startTS || streamTS > endTS {
+				continue
+			}
+
+			for _, streamID := range ds.StreamOrder.IdsStruct[streamTS] {
+				if streamTS == 0 && streamID == 0 {
+					continue
+				}
+
+				if streamTS == startTS && streamID < startID {
+					continue
+				}
+
+				if streamTS == endTS && streamID > endID {
+					continue
+				}
+
+				streamId := fmt.Sprintf("%d-%d", streamTS, streamID)
+				data := map[string]string{}
+
+				for k, v := range ds.Data[streamId].Data {
+					data[k] = v
+				}
+
+				record := StreamRecord{
+					RecordId: streamId,
+					Data:     data,
+				}
+
+				streamData = append(streamData, record)
+			}
+		}
+
+		if len(streamData) > 0 {
+			outData[key] = streamData
+		}
+	}
+
+	return outData
+}
+
 var Stream = smartStream{
 	DataSet: map[string]*StreamDataSet{},
+	Ch:      make(chan string, 256),
 }
